@@ -13,7 +13,7 @@
 #include <omp.h>
 #include <string.h>
 
-#define DEBUG_MAGIC_NUMBERS_ITERATIONS 1
+#define DEBUG_MAGIC_NUMBERS_ITERATIONS 0
 
 CCHESS_FORCE_INLINE uint64_t random_sparse_64()
 {
@@ -23,17 +23,21 @@ CCHESS_FORCE_INLINE uint64_t random_sparse_64()
 uint64_t generate_occupancy(uint32_t index, uint32_t bits_in_mask, uint64_t mask) 
 {
     uint64_t occupancy = 0ULL;
+    uint32_t bit_position = 0;
+    uint64_t temp_mask = mask;
 
-    for(uint32_t count = 0; count < bits_in_mask; count++) 
+    while(temp_mask)
     {
-        uint32_t bit_position = ctz_u64(mask);
-
-        if(index & (1 << count))
+        bit_position = ctz_u64(temp_mask);
+        
+        temp_mask &= (temp_mask - 1);
+        
+        if(index & (1 << bits_in_mask - 1))
         {
             occupancy |= (1ULL << bit_position);
         }
-
-        mask &= (mask - 1);
+            
+        index >>= 1;
     }
 
     return occupancy;
@@ -45,7 +49,7 @@ uint64_t get_rook_attacks(const uint32_t square, const uint64_t block)
     const uint32_t rank = square / 8;
     const uint32_t file = square % 8;
     
-    for(uint32_t r = rank + 1; r <= 7; r++) 
+    for(int32_t r = rank + 1; r <= 7; r++) 
     {
         attacks |= (1ULL << (r * 8 + file));
 
@@ -55,7 +59,7 @@ uint64_t get_rook_attacks(const uint32_t square, const uint64_t block)
         }
     }
 
-    for(uint32_t r = rank - 1; r >= 0; r--) 
+    for(int32_t r = rank - 1; r >= 0; r--) 
     {
         attacks |= (1ULL << (r * 8 + file));
 
@@ -65,7 +69,7 @@ uint64_t get_rook_attacks(const uint32_t square, const uint64_t block)
         }
     }
 
-    for (uint32_t f = file + 1; f <= 7; f++) 
+    for (int32_t f = file + 1; f <= 7; f++) 
     {
         attacks |= (1ULL << (rank * 8 + f));
 
@@ -75,7 +79,7 @@ uint64_t get_rook_attacks(const uint32_t square, const uint64_t block)
         }
     }
 
-    for (uint32_t f = file - 1; f >= 0; f--) 
+    for (int32_t f = file - 1; f >= 0; f--) 
     {
         attacks |= (1ULL << (rank * 8 + f));
 
@@ -94,7 +98,7 @@ uint64_t get_bishop_attacks(const uint32_t square, const uint64_t block)
     const uint32_t rank = square / 8;
     const uint32_t file = square % 8;
     
-    for(uint32_t r = rank + 1, f = file + 1; r <= 7 && f <= 7; r++, f++) 
+    for(int32_t r = rank + 1, f = file + 1; r <= 7 && f <= 7; r++, f++) 
     {
         attacks |= (1ULL << (r * 8 + f));
 
@@ -104,7 +108,7 @@ uint64_t get_bishop_attacks(const uint32_t square, const uint64_t block)
         }
     }
 
-    for(uint32_t r = rank + 1, f = file - 1; r <= 7 && f >= 0; r++, f--) 
+    for(int32_t r = rank + 1, f = file - 1; r <= 7 && f >= 0; r++, f--) 
     {
         attacks |= (1ULL << (r * 8 + f));
 
@@ -114,7 +118,7 @@ uint64_t get_bishop_attacks(const uint32_t square, const uint64_t block)
         }
     }
 
-    for(uint32_t r = rank - 1, f = file + 1; r >= 0 && f <= 7; r--, f++) 
+    for(int32_t r = rank - 1, f = file + 1; r >= 0 && f <= 7; r--, f++) 
     {
         attacks |= (1ULL << (r * 8 + f));
 
@@ -124,7 +128,7 @@ uint64_t get_bishop_attacks(const uint32_t square, const uint64_t block)
         }
     }
 
-    for(uint32_t r = rank - 1, f = file - 1; r >= 0 && f >= 0; r--, f--) 
+    for(int32_t r = rank - 1, f = file - 1; r >= 0 && f >= 0; r--, f--) 
     {
         attacks |= (1ULL << (r * 8 + f));
 
@@ -143,20 +147,12 @@ uint64_t magic_number_find_best(const uint64_t mask,
                                 const uint32_t num_iterations,
                                 const bool is_bishop) 
 {
-#if DEBUG_MAGIC_NUMBERS_ITERATIONS
-    printf("Searching magic number for square: %d\n", square);
-#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
-
     uint64_t attacks[4096];
     uint64_t occupancies[4096];
     uint64_t table[4096];
 
     uint32_t n = popcount_u64(mask);
     uint32_t num_occupancies = 1 << n;
-
-#if DEBUG_MAGIC_NUMBERS_ITERATIONS
-    printf("Generating %d occupancies\n", num_occupancies);
-#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
 
     for(uint32_t i = 0; i < num_occupancies; i++)
     {
@@ -165,10 +161,6 @@ uint64_t magic_number_find_best(const uint64_t mask,
         attacks[i] = is_bishop ? get_bishop_attacks(square, occupancies[i]) :
                                  get_rook_attacks(square, occupancies[i]);
     }
-
-#if DEBUG_MAGIC_NUMBERS_ITERATIONS
-    printf("Generated %d occupancies\n", num_occupancies);
-#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
 
     for(uint32_t attempt = 0; attempt < num_iterations; ++attempt) 
     {
@@ -207,12 +199,19 @@ uint64_t magic_number_find_best(const uint64_t mask,
 
         if(!failed)
         {
-            printf("Square: %d | 0x%llX", square, magic);
+#if DEBUG_MAGIC_NUMBERS_ITERATIONS
+            printf("\n");
+#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
+            printf("Square: %d | 0x%llX\n", square, magic);
             return magic;
         }
     }
 
-    printf("Square: %d failed", square);
+#if DEBUG_MAGIC_NUMBERS_ITERATIONS
+    printf("\n");
+#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
+
+    printf("Square: %d failed\n", square);
 
     return 0;
 }
