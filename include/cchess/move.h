@@ -75,7 +75,32 @@ CCHESS_FORCE_INLINE uint64_t move_gen_bishop_mask(const uint32_t index, const ui
 
 CCHESS_FORCE_INLINE uint64_t move_gen_bishop_mask_special(const uint32_t index)
 {
-    return move_gen_bishop_mask(index, 0) & INV_BORDERS;
+    const uint32_t rank = BOARD_RANK_FROM_POS(index);
+    const uint32_t file = BOARD_FILE_FROM_POS(index);
+
+    uint64_t mask = 0;
+
+    for(int r = rank + 1, f = file + 1; r < 7 && f < 7; r++, f++) 
+    {
+        mask |= (1ULL << (r * 8 + f));
+    }
+
+    for(int r = rank + 1, f = file - 1; r < 7 && f > 0; r++, f--)
+    {
+        mask |= (1ULL << (r * 8 + f));
+    }
+
+    for(int r = rank - 1, f = file + 1; r > 0 && f < 7; r--, f++)
+    {
+        mask |= (1ULL << (r * 8 + f));
+    }
+
+    for(int r = rank - 1, f = file - 1; r > 0 && f > 0; r--, f--)
+    {
+        mask |= (1ULL << (r * 8 + f));
+    }
+
+    return mask;
 }
 
 CCHESS_FORCE_INLINE uint64_t move_gen_rook_mask(const uint32_t index, const uint32_t side)
@@ -98,20 +123,30 @@ CCHESS_FORCE_INLINE uint64_t move_gen_rook_mask(const uint32_t index, const uint
 
 CCHESS_FORCE_INLINE uint64_t move_gen_rook_mask_special(const uint32_t index) 
 {
-    const uint8_t rank = BOARD_RANK_FROM_POS(index);
-    const uint8_t file = BOARD_FILE_FROM_POS(index);
-
-    const uint64_t rook_mask = BOARD_BIT_FROM_FILE_AND_RANK(file, rank);
+    const uint32_t rank = BOARD_RANK_FROM_POS(index);
+    const uint32_t file = BOARD_FILE_FROM_POS(index);
 
     uint64_t mask = 0ULL;
+    
+    for(int r = rank + 1; r < 7; r++)
+    {
+        mask |= (1ULL << (r * 8 + file));
+    }
 
-    const uint64_t rank_moves = RANKX(rank) & ~(FILEA | FILEH);
+    for(int r = rank - 1; r > 0; r--) 
+    {
+        mask |= (1ULL << (r * 8 + file));
+    }
 
-    const uint64_t file_moves = FILEX(file) & ~(RANK1 | RANK8);
+    for(int f = file + 1; f < 7; f++) 
+    {
+        mask |= (1ULL << (rank * 8 + f));
+    }
 
-    mask = rank_moves | file_moves;
-
-    mask &= ~rook_mask;
+    for(int f = file - 1; f > 0; f--) 
+    {
+        mask |= (1ULL << (rank * 8 + f));
+    }
 
     return mask;
 }

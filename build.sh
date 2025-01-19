@@ -55,7 +55,7 @@ log_error()
     echo "[ERROR] : $1"
 }
 
-log_info "Building cchess"
+log_info "Building CChess"
 
 for arg in "$@"
 do

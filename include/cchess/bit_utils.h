@@ -108,4 +108,9 @@ CCHESS_FORCE_INLINE uint64_t abs_u64(const int64_t x)
     return (uint64_t)((mask ^ x) - mask);
 }
 
+CCHESS_FORCE_INLINE uint64_t lsb_u64(const uint64_t x)
+{
+    return x & -x;
+}
+
 #endif /* !defined(__BITUTILS) */

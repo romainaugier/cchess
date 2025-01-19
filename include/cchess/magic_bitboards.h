@@ -16,8 +16,6 @@ CCHESS_API uint64_t magic_number_find_best_bishop(const uint32_t square,
                                                   const uint32_t relevant_bits,
                                                   const uint32_t num_iterations);
 
-CCHESS_API uint32_t magic_index(uint64_t blockers, uint64_t magic, uint32_t bits);
-
 CCHESS_API void magic_number_find_all();
 
 CCHESS_API void magic_bitboards_init();

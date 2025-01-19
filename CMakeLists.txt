@@ -17,6 +17,9 @@ endif()
 
 find_package(OpenMP)
 
+set(libromano_DIR "${CMAKE_SOURCE_DIR}/libromano/install/cmake")
+find_package(libromano)
+
 add_subdirectory(src)
 
 if(RUN_TESTS EQUAL 1)

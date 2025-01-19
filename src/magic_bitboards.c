@@ -1,161 +1,220 @@
 #include "cchess/magic_bitboards.h"
 #include "cchess/move.h"
-#include "cchess/random.h"
+#include "cchess/bit_utils.h"
 
-// #define CCHESS_ENABLE_PROFILING
-#include "cchess/profiling.h"
+#include "libromano/random.h"
+#include "libromano/memory.h"
+
+// #define ROMANO_ENABLE_PROFILING
+#include "libromano/profiling.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <omp.h>
 #include <string.h>
 
-#define DEBUG_MAGIC_NUMBERS_ITERATIONS 0
+#define DEBUG_MAGIC_NUMBERS_ITERATIONS 1
 
-uint32_t magic_index(uint64_t blockers, uint64_t magic, uint32_t bits) 
+CCHESS_FORCE_INLINE uint64_t random_sparse_64()
 {
-    return (uint32_t)((blockers * magic) >> (64 - bits));
+    return random_lehmer_64() & random_lehmer_64() & random_lehmer_64();
 }
 
-void generate_blocker_boards(uint64_t mask, 
-                             uint64_t* blockers, 
-                             uint64_t* count, 
-                             uint32_t index,
-                             uint64_t current) 
+uint64_t generate_occupancy(uint32_t index, uint32_t bits_in_mask, uint64_t mask) 
 {
-    if(mask == 0)
+    uint64_t occupancy = 0ULL;
+
+    for(uint32_t count = 0; count < bits_in_mask; count++) 
     {
-        blockers[*count] = current;
-        (*count)++;
+        uint32_t bit_position = ctz_u64(mask);
 
-        return;
-    }
-
-    const uint64_t lsb = mask & -mask;
-    
-    generate_blocker_boards(mask & (mask - 1), blockers, count, index + 1, current | lsb);
-    
-    generate_blocker_boards(mask & (mask - 1), blockers, count, index + 1, current);
-}
-
-void test_magic_number(const uint64_t magic,
-                       const uint32_t bits, 
-                       uint64_t* restrict table, 
-                       uint64_t* restrict blockers, 
-                       const uint64_t blocker_count,
-                       uint8_t* restrict filled_indices,
-                       uint32_t* collisions, 
-                       uint32_t* unique_count) 
-{
-    memset(table, 0, sizeof(uint64_t) * (1 << bits));
-    memset(filled_indices, 0, sizeof(uint8_t) * (1 << bits));
-
-    uint32_t total_collisions = 0;
-    uint32_t uniques_indices = 0;
-
-    for(uint32_t i = 0; i < (uint32_t)blocker_count; ++i) 
-    {
-        uint32_t index = magic_index(blockers[i], magic, bits);
-        
-        if(table[index] == 0) 
+        if(index & (1 << count))
         {
-            table[index] = blockers[i];
-            uniques_indices++;
-        } 
-        else if(table[index] != blockers[i])
-        {
-            total_collisions++;
-        }
-        
-        filled_indices[index] = 1;
-    }
-
-    uint32_t filled_count = 0;
-
-    for(uint32_t i = 0; i < (1 << bits); ++i) 
-    {
-        filled_count += filled_indices[i];
-    }
-
-    *collisions = total_collisions;
-    *unique_count = filled_count;
-}
-
-uint64_t magic_number_find_best(const uint64_t mask,
-                                const uint32_t square, 
-                                const uint32_t relevant_bits,
-                                const uint32_t num_iterations) 
-{
-    uint64_t best_magic = 0;
-    uint32_t min_collisions = INT32_MAX;
-    uint32_t max_uniques_indices = 0;
-
-    uint64_t blocker_count = 0;
-    uint64_t* blockers = (uint64_t*)calloc(0x4000, sizeof(uint64_t));
-
-    generate_blocker_boards(mask, blockers, &blocker_count, 0, 0);
-
-    uint64_t table[1 << relevant_bits];
-
-    uint8_t* filled_indices = (uint8_t*)calloc(1 << relevant_bits, sizeof(uint32_t));
-
-    for(uint32_t attempt = 0; attempt < num_iterations; ++attempt) 
-    {
-        uint64_t magic = random_wyhash_64() & 
-                         random_wyhash_64() &
-                         random_wyhash_64() & 
-                         random_wyhash_64();
-
-        uint32_t collisions = 0;
-        uint32_t uniques_indices = 0;
-
-        test_magic_number(magic,
-                          relevant_bits,
-                          table,
-                          blockers,
-                          blocker_count,
-                          filled_indices,
-                          &collisions,
-                          &uniques_indices); 
-
-        if(collisions < min_collisions ||
-           (collisions == min_collisions && uniques_indices > max_uniques_indices)) 
-        {
-            best_magic = magic;
-            min_collisions = collisions;
-            max_uniques_indices = uniques_indices;
+            occupancy |= (1ULL << bit_position);
         }
 
-#if DEBUG_MAGIC_NUMBERS_ITERATIONS
-        printf("\r[%u/%u] Square: %u | 0x%llX %u %u                        ",
-               attempt,
-               num_iterations,
-               square,
-               best_magic,
-               min_collisions,
-               max_uniques_indices);
-#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
+        mask &= (mask - 1);
+    }
 
-        if(min_collisions == 0)
+    return occupancy;
+}
+
+uint64_t get_rook_attacks(const uint32_t square, const uint64_t block) 
+{
+    uint64_t attacks = 0ULL;
+    const uint32_t rank = square / 8;
+    const uint32_t file = square % 8;
+    
+    for(uint32_t r = rank + 1; r <= 7; r++) 
+    {
+        attacks |= (1ULL << (r * 8 + file));
+
+        if(block & (1ULL << (r * 8 + file))) 
         {
             break;
         }
     }
 
+    for(uint32_t r = rank - 1; r >= 0; r--) 
+    {
+        attacks |= (1ULL << (r * 8 + file));
+
+        if(block & (1ULL << (r * 8 + file))) 
+        {
+            break;
+        }
+    }
+
+    for (uint32_t f = file + 1; f <= 7; f++) 
+    {
+        attacks |= (1ULL << (rank * 8 + f));
+
+        if(block & (1ULL << (rank * 8 + f))) 
+        {
+            break;
+        }
+    }
+
+    for (uint32_t f = file - 1; f >= 0; f--) 
+    {
+        attacks |= (1ULL << (rank * 8 + f));
+
+        if(block & (1ULL << (rank * 8 + f))) 
+        {
+            break;
+        }
+    }
+    
+    return attacks;
+}
+
+uint64_t get_bishop_attacks(const uint32_t square, const uint64_t block) 
+{
+    uint64_t attacks = 0ULL;
+    const uint32_t rank = square / 8;
+    const uint32_t file = square % 8;
+    
+    for(uint32_t r = rank + 1, f = file + 1; r <= 7 && f <= 7; r++, f++) 
+    {
+        attacks |= (1ULL << (r * 8 + f));
+
+        if(block & (1ULL << (r * 8 + f))) 
+        {
+            break;
+        }
+    }
+
+    for(uint32_t r = rank + 1, f = file - 1; r <= 7 && f >= 0; r++, f--) 
+    {
+        attacks |= (1ULL << (r * 8 + f));
+
+        if(block & (1ULL << (r * 8 + f))) 
+        {
+            break;
+        }
+    }
+
+    for(uint32_t r = rank - 1, f = file + 1; r >= 0 && f <= 7; r--, f++) 
+    {
+        attacks |= (1ULL << (r * 8 + f));
+
+        if(block & (1ULL << (r * 8 + f))) 
+        {
+            break;
+        }
+    }
+
+    for(uint32_t r = rank - 1, f = file - 1; r >= 0 && f >= 0; r--, f--) 
+    {
+        attacks |= (1ULL << (r * 8 + f));
+
+        if(block & (1ULL << (r * 8 + f))) 
+        {
+            break;
+        }
+    }
+    
+    return attacks;
+}
+
+uint64_t magic_number_find_best(const uint64_t mask,
+                                const uint32_t square, 
+                                const uint32_t relevant_bits,
+                                const uint32_t num_iterations,
+                                const bool is_bishop) 
+{
 #if DEBUG_MAGIC_NUMBERS_ITERATIONS
-    printf("\n");
+    printf("Searching magic number for square: %d\n", square);
 #endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
 
-    printf("Square: %u | 0x%llX %u %u\n",
-           square,
-           best_magic,
-           min_collisions,
-           max_uniques_indices);
+    uint64_t attacks[4096];
+    uint64_t occupancies[4096];
+    uint64_t table[4096];
 
-    free(blockers);
-    free(filled_indices);
+    uint32_t n = popcount_u64(mask);
+    uint32_t num_occupancies = 1 << n;
 
-    return best_magic;
+#if DEBUG_MAGIC_NUMBERS_ITERATIONS
+    printf("Generating %d occupancies\n", num_occupancies);
+#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
+
+    for(uint32_t i = 0; i < num_occupancies; i++)
+    {
+        occupancies[i] = generate_occupancy(i, n, mask);
+
+        attacks[i] = is_bishop ? get_bishop_attacks(square, occupancies[i]) :
+                                 get_rook_attacks(square, occupancies[i]);
+    }
+
+#if DEBUG_MAGIC_NUMBERS_ITERATIONS
+    printf("Generated %d occupancies\n", num_occupancies);
+#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
+
+    for(uint32_t attempt = 0; attempt < num_iterations; ++attempt) 
+    {
+        const uint64_t magic = random_sparse_64();
+
+        if(popcount_u64((mask * magic) & 0xFF00000000000000ULL) < 6) 
+        {
+            continue;
+        }
+
+        memset(table, 0, sizeof(table));
+
+        bool failed = false;
+
+        for(uint32_t i = 0; !failed && i < num_occupancies; i++)
+        {
+            uint32_t j = (uint32_t)((occupancies[i] * magic) >> (64 - relevant_bits));
+
+            if(table[j] == 0)
+            {
+                table[j] = attacks[i];
+            }
+            else if(table[j] != attacks[i])
+            {
+                failed = true;
+            }
+        }
+
+#if DEBUG_MAGIC_NUMBERS_ITERATIONS
+        printf("\r[%u/%u] Square: %u | 0x%llX                              ",
+               attempt,
+               num_iterations,
+               square,
+               magic);
+#endif /* DEBUG_MAGIC_NUMBERS_ITERATIONS */
+
+        if(!failed)
+        {
+            printf("Square: %d | 0x%llX", square, magic);
+            return magic;
+        }
+    }
+
+    printf("Square: %d failed", square);
+
+    return 0;
 }
 
 uint64_t magic_number_find_best_rook(const uint32_t square,
@@ -167,7 +226,8 @@ uint64_t magic_number_find_best_rook(const uint32_t square,
     const uint64_t magic = magic_number_find_best(mask, 
                                                   square,
                                                   relevant_bits,
-                                                  num_iterations);
+                                                  num_iterations,
+                                                  false);
 
     // printf("Perfect magic number for square %u for rook: 0x%llx\n", square, magic);
 
@@ -183,7 +243,8 @@ uint64_t magic_number_find_best_bishop(const uint32_t square,
     const uint64_t magic = magic_number_find_best(mask,
                                                   square,
                                                   relevant_bits,
-                                                  num_iterations);
+                                                  num_iterations,
+                                                  true);
 
     // printf("Perfect magic number for square %u for bishop: 0x%llx\n", square, magic);
 
@@ -192,7 +253,7 @@ uint64_t magic_number_find_best_bishop(const uint32_t square,
 
 void magic_number_find_all()
 {
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for(uint32_t i = 0; i < 64; i++)
     {
         SCOPED_PROFILE_START_MILLISECONDS(magic_number_find);
@@ -204,7 +265,7 @@ void magic_number_find_all()
         SCOPED_PROFILE_END_MILLISECONDS(magic_number_find);
     }
 
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for(uint32_t i = 0; i < 64; i++)
     {
         SCOPED_PROFILE_START_MILLISECONDS(magic_number_find);
@@ -491,75 +552,7 @@ static uint64_t* _magic_bitboards_bishop = NULL;
 
 void magic_bitboards_init()
 {
-    if(_magic_bitboards_rook == NULL)
-    {
-        printf("Initializing rooks magic bitboards\n");
-
-        SCOPED_PROFILE_START_MILLISECONDS(magic_bitboards_rook_init);
-
-        uint64_t total_size = 0;
-
-        _magic_bitboards_rook = (uint64_t*)calloc(64 * 4096, sizeof(uint64_t));
-
-        for(uint64_t square = 0; square < 64; square++)
-        {
-            const uint64_t mask = move_gen_rook_mask_special(square);
-
-            uint64_t offset = 0;
-
-            generate_blocker_boards(mask, 
-                                    &_magic_bitboards_rook[total_size],
-                                    &offset,
-                                    0,
-                                    0);
-
-            total_size += (uint64_t)_magic_offsets_rook[square];
-        }
-
-        _magic_bitboards_rook = (uint64_t*)realloc(_magic_bitboards_rook,
-                                                   total_size * sizeof(uint64_t));
-
-        printf("Initialized rooks magic bitboards (%llu). Total lookup size: %.02f kbytes\n", 
-               total_size,
-               (double)(total_size * sizeof(uint64_t)) / 1000.0);
-
-        SCOPED_PROFILE_END_MILLISECONDS(magic_bitboards_rook_init);
-    }
-
-    if(_magic_bitboards_bishop == NULL)
-    {
-        printf("Initializing bishops magic bitboards\n");
-
-        SCOPED_PROFILE_START_MILLISECONDS(magic_bitboards_bishop_init);
-
-        uint64_t total_size = 0;
-
-        _magic_bitboards_bishop = (uint64_t*)calloc(64 * 512, sizeof(uint64_t));
-
-        for(uint64_t square = 0; square < 64; square++)
-        {
-            const uint64_t mask = move_gen_bishop_mask_special(square);
-
-            uint64_t offset = 0;
-
-            generate_blocker_boards(mask, 
-                                    &_magic_bitboards_bishop[total_size],
-                                    &offset,
-                                    0,
-                                    0);
-
-            total_size += (uint64_t)_magic_offsets_bishop[square];
-        }
-
-        _magic_bitboards_bishop = (uint64_t*)realloc(_magic_bitboards_bishop,
-                                                   total_size * sizeof(uint64_t));
-
-        printf("Initialized bishops magic bitboards (%llu). Total lookup size: %.02f kbytes\n", 
-               total_size,
-               (double)(total_size * sizeof(uint64_t)) / 1000.0);
-
-        SCOPED_PROFILE_END_MILLISECONDS(magic_bitboards_bishop_init);
-    }
+    return;
 }
 
 void magic_bitboards_destroy()
@@ -579,44 +572,20 @@ void magic_bitboards_destroy()
 
 uint64_t magic_bitboards_get_rook_index(uint32_t square, uint64_t blockers)
 {
-    assert(_magic_bitboards_rook != NULL);
-
-    const uint64_t offset = _magic_offsets_rook[square];
-    const uint64_t magic = _magic_numbers_rook[square];
-
-    return (uint64_t)magic_index(blockers, magic, ROOK_RELEVANT_BITS);
+    return 0ULL;
 }
 
 uint64_t magic_bitboards_get_bishop_index(uint32_t square, uint64_t blockers)
 {
-    assert(_magic_bitboards_bishop != NULL);
-
-    const uint64_t offset = _magic_offsets_bishop[square];
-    const uint64_t magic = _magic_numbers_bishop[square];
-
-    return magic_index(blockers, magic, BISHOP_RELEVANT_BITS);
+    return 0ULL;
 }
 
 uint64_t magic_bitboards_get_rook(uint32_t square, uint64_t blockers)
 {
-    assert(_magic_bitboards_rook != NULL);
-
-    const uint64_t offset = _magic_offsets_rook[square];
-    const uint64_t magic = _magic_numbers_rook[square];
-
-    const uint32_t index = magic_index(blockers, magic, ROOK_RELEVANT_BITS);
-
-    return _magic_bitboards_rook[offset + index];
+    return 0ULL;
 }
 
 uint64_t magic_bitboards_get_bishop(uint32_t square, uint64_t blockers)
 {
-    assert(_magic_bitboards_bishop != NULL);
-
-    const uint64_t offset = _magic_offsets_bishop[square];
-    const uint64_t magic = _magic_numbers_bishop[square];
-
-    const uint32_t index = magic_index(blockers, magic, BISHOP_RELEVANT_BITS);
-
-    return _magic_bitboards_bishop[offset + index];
+    return 0ULL;
 }

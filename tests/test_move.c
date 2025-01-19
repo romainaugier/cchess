@@ -2,8 +2,8 @@
 #include "cchess/move.h"
 #include "cchess/magic_bitboards.h"
 
-#define CCHESS_ENABLE_PROFILING
-#include "cchess/profiling.h"
+#define ROMANO_ENABLE_PROFILING
+#include "libromano/profiling.h"
 
 #define DEBUG_MOVE_MASKS 1
 
@@ -13,26 +13,8 @@ void test_rook_moves(uint32_t square)
 {
     printf("Testing rook moves for square %d\n", square);
     
-    // First, let's see the mask
-    uint64_t mask = move_gen_rook_mask_special(square);
-    printf("Special rook mask:\n");
+    const uint64_t mask = move_gen_rook_mask_special(square);
     board_debug_move_mask(mask, square);
-    
-    // Let's try with no blockers
-    uint64_t no_blockers = 0ULL;
-    printf("Index for no blockers: %u\n", magic_bitboards_get_rook_index(square, no_blockers & mask));
-    
-    uint64_t moves = magic_bitboards_get_rook(square, no_blockers & mask);
-    printf("Moves with no blockers:\n");
-    board_debug_move_mask(moves, square);
-    
-    // Try with one blocker
-    uint64_t one_blocker = 1ULL << (square + 8); // one square up
-    printf("Index for one blocker: %u\n", magic_bitboards_get_rook_index(square, one_blocker & mask));
-    
-    moves = magic_bitboards_get_rook(square, one_blocker & mask);
-    printf("Moves with one blocker:\n");
-    board_debug_move_mask(moves, square);
 }
 
 int main(int argc, char** argv)

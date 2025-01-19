@@ -144,9 +144,6 @@
 #define CCHESS_DEBUG 0
 #endif /* defined(DEBUG_BUILD) */
 
-#define CCHESS_NAMESPACE_BEGIN namespace opacu {
-#define CCHESS_NAMESPACE_END }
-
 #define CCHESS_ATEXIT_REGISTER(func, exit)                                          \
         int res_##func = atexit(func);                                              \
         if(res_##func != 0)                                                         \
