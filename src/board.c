@@ -1,12 +1,10 @@
 #include "cchess/board.h"
 #include "cchess/bit_utils.h"
 #include "cchess/char_utils.h"
-#include "cchess/magic_bitboards.h"
 #include "cchess/move.h"
 
 #include <stdio.h>
 #include <string.h>
-#include <threads.h>
 
 Board board_init()
 {
@@ -143,93 +141,14 @@ end:
     return b;
 }
 
-typedef uint64_t (*move_mask_func)(const uint32_t, 
-                                   const uint32_t,
-                                   const uint64_t,
-                                   const uint64_t);
-
-uint64_t _move_mask_pawn(const uint32_t index,
-                         const uint32_t side,
-                         const uint64_t blockers_white,
-                         const uint64_t blockers_black)
-{
-    return move_gen_pawn_mask(index, side);
-}
-
-uint64_t _move_mask_knight(const uint32_t index, 
-                           const uint32_t side,
-                           const uint64_t blockers_white,
-                           const uint64_t blockers_black)
-{
-    return move_gen_knight_mask(index, side);
-}
-
-uint64_t _move_mask_bishop(const uint32_t index, 
-                           const uint32_t side,
-                           const uint64_t blockers_white,
-                           const uint64_t blockers_black)
-{
-    const uint64_t mask = move_gen_bishop_mask(index, side) & INV_BORDERS;
-    const uint64_t blockers = blockers_white | blockers_black;
-
-    return magic_bitboards_get_bishop(index, mask & blockers);
-}
-
-uint64_t _move_mask_rook(const uint32_t index,
-                         const uint32_t side,
-                         const uint64_t blockers_white,
-                         const uint64_t blockers_black)
-{
-    const uint64_t mask = move_gen_rook_mask_special(index);
-    const uint64_t blockers = blockers_white | blockers_black;
-
-    return magic_bitboards_get_rook(index, blockers & mask);
-}
-
-uint64_t _move_mask_queen(const uint32_t index,
-                          const uint32_t side,
-                          const uint64_t blockers_white,
-                          const uint64_t blockers_black)
-{
-    const uint64_t mask = move_gen_bishop_mask(index, side);
-
-    const uint64_t blockers = blockers_white | blockers_black;
-
-    const uint64_t side_blockers = (side == PIECE_WHITE) ? blockers_white : blockers_black;
-
-    return (magic_bitboards_get_bishop(index, blockers) | 
-            magic_bitboards_get_rook(index, blockers)) & ~side_blockers;
-}
-
-uint64_t _move_mask_king(const uint32_t index,
-                         const uint32_t side,
-                         const uint64_t blockers_white,
-                         const uint64_t blockers_black)
-{
-    return move_gen_king_mask(index, side) & ((side == PIECE_WHITE) ? ~blockers_white : 
-                                                                      ~blockers_black);
-}
-
-move_mask_func __move_mask_funcs[6] = {
-    _move_mask_pawn,
-    _move_mask_knight,
-    _move_mask_bishop,
-    _move_mask_rook,
-    _move_mask_queen,
-    _move_mask_king
+move_gen_func __move_gen_funcs[6] = {
+    move_gen_pawn,
+    move_gen_knight,
+    move_gen_bishop,
+    move_gen_rook,
+    move_gen_queen,
+    move_gen_king
 };
-
-/* 
-    A move is represented using 16 bits
-
-    0  000  000000  000000
-    c   P    from     to
-
-    c stands for capturing or not
-    P stands for piece
-    from is the file and rank from where we move
-    to is the file rand rank where we move
-*/
 
 #define MOVE_GET_PIECE(m) (((m) >> 12) & 0x7)
 #define MOVE_GET_IS_CAPTURING(m) ((m) & (0x8000))
@@ -245,17 +164,10 @@ move_mask_func __move_mask_funcs[6] = {
 #define MOVE_SET_TO_FILE(m, f) ((m) = (((m) & ~0x38) | ((f) << 3)))
 #define MOVE_SET_TO_RANK(m, r) ((m) = (((m) & ~0x7) | (r)))
 
-#define PAWN_MOVE_MASK(x, y)
-#define KNIGHT_MOVE_MASK(x, y)
-#define BISHOP_MOVE_MASK(x, y)
-#define ROOK_MOVE_MASK(x, y)
-#define QUEEN_MOVE_MASK(x, y)
-#define KING_MOVE_MASK(x, y)
-
-static thread_local uint64_t _mit_i = 0;
-static thread_local uint64_t _mit_j = 0;
-static thread_local uint64_t _mit_k = 0;
-static thread_local uint64_t _mit_l = 0;
+static uint64_t _mit_i = 0;
+static uint64_t _mit_j = 0;
+static uint64_t _mit_k = 0;
+static uint64_t _mit_l = 0;
 
 bool board_legal_moves_iterator(Board* board, Move* move, IteratorMoveType move_type)
 {
@@ -273,12 +185,12 @@ bool board_legal_moves_iterator(Board* board, Move* move, IteratorMoveType move_
                                   board->queens[1] |
                                   board->kings[1];
 
-    const uint64_t const pieces[2] = {
+    const uint64_t pieces[2] = {
         white_pieces,
         black_pieces,
     };
 
-    const uint64_t const inv_pieces[2] = {
+    const uint64_t inv_pieces[2] = {
         ~white_pieces,
         ~black_pieces,
     };
@@ -304,7 +216,7 @@ bool board_legal_moves_iterator(Board* board, Move* move, IteratorMoveType move_
             while(_mit_k < num_pieces)
             {
                 const uint32_t piece_index = ctz_u64(b);
-                const uint64_t move_mask = __move_mask_funcs[piece](piece_index,
+                const uint64_t move_mask = __move_gen_funcs[piece](piece_index,
                                                                     side,
                                                                     white_pieces,
                                                                     black_pieces);
@@ -409,12 +321,12 @@ void board_debug_move_masks(Board* board)
                                   board->queens[1] |
                                   board->kings[1];
 
-    const uint64_t const pieces[2] = {
+    const uint64_t pieces[2] = {
         white_pieces,
         black_pieces,
     };
 
-    const uint64_t const inv_pieces[2] = {
+    const uint64_t inv_pieces[2] = {
         ~white_pieces,
         ~black_pieces,
     };
@@ -438,7 +350,7 @@ void board_debug_move_masks(Board* board)
             for(size_t k = 0; k < num_pieces; k++)
             {
                 const uint32_t piece_index = ctz_u64(b);
-                const uint64_t move_mask = __move_mask_funcs[piece](piece_index,
+                const uint64_t move_mask = __move_gen_funcs[piece](piece_index,
                                                                     side,
                                                                     white_pieces,
                                                                     black_pieces); 

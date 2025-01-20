@@ -43,6 +43,18 @@ typedef struct Board
     uint8_t state;
 } Board;
 
+/* 
+    A move is represented using 16 bits
+
+    0  000  000000  000000
+    c   P    from     to
+
+    c stands for capturing or not
+    P stands for piece
+    from is the file and rank from where we move
+    to is the file and rank where we move
+*/
+
 typedef uint16_t Move;
 
 typedef enum

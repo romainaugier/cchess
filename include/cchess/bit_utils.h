@@ -84,6 +84,16 @@ CCHESS_FORCE_INLINE uint32_t ctz_u64(const uint64_t x)
 #endif /* defined(CCHESS_MSVC) */
 }
 
+CCHESS_FORCE_INLINE uint32_t pext_u32(const uint32_t x, const uint32_t y)
+{
+    return _pext_u32(x, y);
+}
+
+CCHESS_FORCE_INLINE uint64_t pext_u64(const uint64_t x, const uint64_t y)
+{
+    return _pext_u64(x, y);
+}
+
 CCHESS_FORCE_INLINE uint8_t abs_u8(const int8_t x)
 {
     const uint8_t mask = x >> 7;
@@ -111,6 +121,11 @@ CCHESS_FORCE_INLINE uint64_t abs_u64(const int64_t x)
 CCHESS_FORCE_INLINE uint64_t lsb_u64(const uint64_t x)
 {
     return x & -x;
+}
+
+CCHESS_FORCE_INLINE uint64_t clsb_u64(const uint64_t x)
+{
+    return x & (x - 1);
 }
 
 #endif /* !defined(__BITUTILS) */

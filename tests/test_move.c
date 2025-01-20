@@ -1,6 +1,5 @@
 #include "cchess/board.h"
 #include "cchess/move.h"
-#include "cchess/magic_bitboards.h"
 
 #define ROMANO_ENABLE_PROFILING
 #include "libromano/profiling.h"
@@ -9,19 +8,11 @@
 
 #include <stdio.h>
 
-void test_rook_moves(uint32_t square) 
-{
-    printf("Testing rook moves for square %d\n", square);
-    
-    const uint64_t mask = move_gen_rook_mask_special(square);
-    board_debug_move_mask(mask, square);
-}
-
 int main(int argc, char** argv)
 {
-    CCHESS_ATEXIT_REGISTER(magic_bitboards_destroy, true);
+    CCHESS_ATEXIT_REGISTER(move_gen_destroy, true);
 
-    magic_bitboards_init();
+    move_gen_init();
 
     const char* start_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -47,8 +38,6 @@ int main(int argc, char** argv)
     SCOPED_PROFILE_END_MICROSECONDS(legal_moves);
 
     printf("Num moves found for %u plies: %llu\n", plies, num_moves);
-
-    test_rook_moves(28);
 
     return 0;
 }
