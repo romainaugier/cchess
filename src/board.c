@@ -1,7 +1,7 @@
 #include "cchess/board.h"
 #include "cchess/bit_utils.h"
 #include "cchess/char_utils.h"
-#include "cchess/move.h"
+#include "cchess/board_macros.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -141,6 +141,60 @@ end:
     return b;
 }
 
+#define USE_SIMD 0
+
+#if USE_SIMD
+typedef union {
+    struct {
+        uint64_t white;
+        uint64_t black;
+    } pieces;
+    __m128i pieces_128;
+} Board128;
+#endif /* USE_SIMD */
+
+uint32_t board_has_piece(Board* board,
+                         const uint32_t piece,
+                         const uint32_t square)
+{
+#if USE_SIMD
+    const uint64_t piece_mask = 1ULL << square;
+    
+    Board128 mask;
+    mask.pieces.white = piece_mask;
+    mask.pieces.black = piece_mask;
+    
+    Board128* positions = (Board128*)(&((uint64_t*)board)[piece * 2]);
+    
+    Board128 result;
+    result.pieces_128 = _mm_and_si128(positions->pieces_128, mask.pieces_128);
+    
+    return PIECE_NONE - (((result.pieces.white != 0) << 1) | (result.pieces.black != 0));
+#else
+    const uint64_t piece_mask = 1 << square;
+
+    uint64_t* board_as_ptr = (uint64_t*)board;
+
+    return 2 - ((board_as_ptr[piece * 2] & piece_mask) << 1) | (board_as_ptr[piece * 2 + 1] & piece_mask);
+#endif /* USE_SIMD */
+}
+
+uint32_t board_make_move(Board* board, Move move)
+{
+    const uint32_t piece = MOVE_GET_PIECE(move);
+    const uint32_t from_square = MOVE_GET_FROM_SQUARE(move);
+    const uint32_t to_square = MOVE_GET_TO_SQUARE(move);
+
+    const uint32_t piece_side = board_has_piece(board, piece, from_square);
+
+    if(piece_side == PIECE_NONE)
+    {
+        return BoardMoveError_PieceDoesNotExist;
+    }
+
+    return 0;
+}
+
 move_gen_func __move_gen_funcs[6] = {
     move_gen_pawn,
     move_gen_knight,
@@ -149,20 +203,6 @@ move_gen_func __move_gen_funcs[6] = {
     move_gen_queen,
     move_gen_king
 };
-
-#define MOVE_GET_PIECE(m) (((m) >> 12) & 0x7)
-#define MOVE_GET_IS_CAPTURING(m) ((m) & (0x8000))
-#define MOVE_GET_FROM_FILE(m) (((m) >> 9) & 0x7)
-#define MOVE_GET_FROM_RANK(m) (((m) >> 6) & 0x7)
-#define MOVE_GET_TO_FILE(m) (((m) >> 3) & 0x7)
-#define MOVE_GET_TO_RANK(m) ((m) & 0x7)
-
-#define MOVE_SET_PIECE(m, p) ((m) = (((m) & ~0x7000) | (p << 12)))
-#define MOVE_SET_IS_CAPTURING(m, c) ((m) = (((m) & ~0x8000) | ((c) << 15)))
-#define MOVE_SET_FROM_FILE(m, f) ((m) = (((m) & ~0xE00) | ((f) << 9)))
-#define MOVE_SET_FROM_RANK(m, r) ((m) = (((m) & ~0x1C0) | ((r) << 6)))
-#define MOVE_SET_TO_FILE(m, f) ((m) = (((m) & ~0x38) | ((f) << 3)))
-#define MOVE_SET_TO_RANK(m, r) ((m) = (((m) & ~0x7) | (r)))
 
 static uint64_t _mit_i = 0;
 static uint64_t _mit_j = 0;
@@ -249,6 +289,11 @@ bool board_legal_moves_iterator(Board* board, Move* move, IteratorMoveType move_
     _mit_i = 0;
 
     return false;
+}
+
+uint64_t board_perft(Board* board, uint32_t num_plies)
+{
+
 }
 
 #define SIZEOF_DEBUG_BOARD (64 + 8 + 1)

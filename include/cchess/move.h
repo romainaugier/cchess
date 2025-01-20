@@ -4,7 +4,30 @@
 #define __MOVE
 
 #include "cchess/cchess.h"
-#include "cchess/board_macros.h"
+
+/* 
+    A move is represented using 16 bits
+
+    0  000  000000  000000
+    c   P    from     to
+
+    c stands for capturing or not
+    P stands for piece
+    from is the square from where we move
+    to is the square where we move
+*/
+
+typedef uint16_t Move;
+
+#define MOVE_GET_PIECE(m) (((m) >> 12) & 0x7)
+#define MOVE_GET_IS_CAPTURING(m) ((m) & (0x8000))
+#define MOVE_GET_FROM_SQUARE(m) (((m) >> 6) & 0x3F)
+#define MOVE_GET_TO_SQUARE(m) ((m) & 0x3F)
+
+#define MOVE_SET_PIECE(m, p) ((m) = (((m) & ~0x7000) | (p << 12)))
+#define MOVE_SET_IS_CAPTURING(m, c) ((m) = (((m) & ~0x8000) | ((c) << 15)))
+#define MOVE_SET_FROM_SQUARE(m, r) ((m) = (((m) & ~0xFC0) | ((r) << 6)))
+#define MOVE_SET_TO_SQUARE(m, r) ((m) = (((m) & ~0x3F) | (r)))
 
 typedef uint64_t (*move_gen_func)(const uint32_t, 
                                   const uint32_t,

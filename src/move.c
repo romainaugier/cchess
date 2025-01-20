@@ -1,4 +1,5 @@
 #include "cchess/move.h"
+#include "cchess/board_macros.h"
 #include "cchess/bit_utils.h"
 
 #include "libromano/memory.h"
@@ -320,6 +321,8 @@ uint64_t move_gen_bishop(const uint32_t square,
                          const uint64_t blockers_white,
                          const uint64_t blockers_black)
 {
+    CCHESS_ASSERT(_bishop_moves_lookup != NULL && "_bishop_moves_lookup has not been initialized");
+
     const uint64_t mask = _bishop_moves_lookup[square];
     const uint64_t blockers_mask = mask & (blockers_white | blockers_black);
     const uint64_t index = pext_u64(blockers_mask, mask);
@@ -332,6 +335,8 @@ uint64_t move_gen_rook(const uint32_t square,
                        const uint64_t blockers_white,
                        const uint64_t blockers_black)
 {
+    CCHESS_ASSERT(_rook_moves_lookup != NULL && "_rook_moves_lookup has not been initialized");
+
     const uint64_t mask = _rook_moves_lookup[square];
     const uint64_t blockers_mask = mask & (blockers_white | blockers_black);
     const uint64_t index = pext_u64(blockers_mask, mask);
@@ -344,6 +349,9 @@ uint64_t move_gen_queen(const uint32_t square,
                         const uint64_t blockers_white,
                         const uint64_t blockers_black)
 {
+    CCHESS_ASSERT(_bishop_moves_lookup != NULL && "_bishop_moves_lookup has not been initialized");
+    CCHESS_ASSERT(_rook_moves_lookup != NULL && "_rook_moves_lookup has not been initialized");
+
     return move_gen_bishop(square, side, blockers_white, blockers_black) | 
            move_gen_rook(square, side, blockers_white, blockers_black);
 }

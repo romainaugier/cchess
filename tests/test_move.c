@@ -39,5 +39,8 @@ int main(int argc, char** argv)
 
     printf("Num moves found for %u plies: %llu\n", plies, num_moves);
 
+    const uint64_t bishop_moves = move_gen_bishop(8, 0, 0, 0);
+    board_debug_move_mask(bishop_moves, 8);
+
     return 0;
 }

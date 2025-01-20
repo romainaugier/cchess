@@ -4,6 +4,7 @@
 #define __BOARD
 
 #include "cchess/cchess.h"
+#include "cchess/move.h"
 
 typedef enum 
 {
@@ -18,6 +19,7 @@ typedef enum
 
 #define PIECE_WHITE 0
 #define PIECE_BLACK 1
+#define PIECE_NONE 2
 
 #define CAPTURING_MOVE 1
 
@@ -43,19 +45,12 @@ typedef struct Board
     uint8_t state;
 } Board;
 
-/* 
-    A move is represented using 16 bits
-
-    0  000  000000  000000
-    c   P    from     to
-
-    c stands for capturing or not
-    P stands for piece
-    from is the file and rank from where we move
-    to is the file and rank where we move
-*/
-
-typedef uint16_t Move;
+typedef enum
+{
+    BoardMoveError_PieceDoesNotExist = 1,
+    BoardMoveError_PieceCantMoveThere = 2,
+    BoardMoveError_PieceCantCapture = 3,
+} BoardMoveError;
 
 typedef enum
 {
@@ -68,7 +63,17 @@ CCHESS_API Board board_init();
 
 CCHESS_API Board board_from_fen(const char* fen);
 
+CCHESS_API uint32_t board_has_piece(Board* board,
+                                    const uint32_t piece,
+                                    const uint32_t square);
+
+CCHESS_API uint32_t board_make_move(Board* board, Move move);
+
+CCHESS_API void board_make_move_no_check(Board* board, Move move);
+
 CCHESS_API bool board_legal_moves_iterator(Board* board, Move* move, IteratorMoveType move_type);
+
+CCHESS_API uint64_t board_perft(Board* board, uint32_t num_plies);
 
 CCHESS_API void board_debug(Board* board);
 

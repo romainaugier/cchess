@@ -105,6 +105,7 @@
 #define CONCAT_(prefix, suffix)     prefix##suffix
 #define CONCAT(prefix, suffix)      CONCAT_(prefix, suffix)
 
+#define CCHESS_ASSERT(expr) assert(expr)
 #define STATIC_ASSERT(expr)                             \
     struct CONCAT(__outscope_assert_, __COUNTER__)      \
     {                                                   \

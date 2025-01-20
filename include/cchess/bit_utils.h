@@ -18,6 +18,8 @@
 
 #if defined(CCHESS_WIN)
 #include <intrin.h>
+#elif defined(CCHESS_GCC)
+#include <immintrin.h>
 #endif /* defined(CCHESS_WIN) */
 
 CCHESS_FORCE_INLINE uint64_t popcount_u32(const uint32_t x)
