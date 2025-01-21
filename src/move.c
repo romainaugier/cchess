@@ -305,7 +305,20 @@ uint64_t move_gen_pawn(const uint32_t square,
                        const uint64_t blockers_white,
                        const uint64_t blockers_black)
 {
-    return move_gen_pawn_mask(square, side) & (side == 0 ? ~blockers_white : ~blockers_black);
+    uint64_t moves = move_gen_pawn_mask(square, side) & ~(blockers_white | blockers_black);
+
+    const uint64_t board_bit = BOARD_BIT_FROM_SQUARE(square);
+
+    if(side == 0)
+    {
+        moves |= ((board_bit << 7) & (board_bit << 9) & blockers_black); 
+    }
+    else
+    {
+        moves |= ((board_bit >> 7) & (board_bit >> 9) & blockers_white);        
+    }
+
+    return moves;
 }
 
 uint64_t move_gen_knight(const uint32_t square,
@@ -326,8 +339,9 @@ uint64_t move_gen_bishop(const uint32_t square,
     const uint64_t mask = _bishop_moves_lookup[square];
     const uint64_t blockers_mask = mask & (blockers_white | blockers_black);
     const uint64_t index = pext_u64(blockers_mask, mask);
+    const uint64_t pieces_mask = side == 0 ? blockers_white : blockers_black;
 
-    return _bishop_moves_lookup[64 + square * BISHOP_NUM_BLOCKERS + index];
+    return _bishop_moves_lookup[64 + square * BISHOP_NUM_BLOCKERS + index] & ~pieces_mask;
 }
 
 uint64_t move_gen_rook(const uint32_t square,
@@ -340,8 +354,9 @@ uint64_t move_gen_rook(const uint32_t square,
     const uint64_t mask = _rook_moves_lookup[square];
     const uint64_t blockers_mask = mask & (blockers_white | blockers_black);
     const uint64_t index = pext_u64(blockers_mask, mask);
+    const uint64_t pieces_mask = side == 0 ? blockers_white : blockers_black;
 
-    return _rook_moves_lookup[64 + square * ROOK_NUM_BLOCKERS + index];
+    return _rook_moves_lookup[64 + square * ROOK_NUM_BLOCKERS + index] & ~pieces_mask;
 }
 
 uint64_t move_gen_queen(const uint32_t square,

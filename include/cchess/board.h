@@ -21,17 +21,17 @@ typedef enum
 #define PIECE_BLACK 1
 #define PIECE_NONE 2
 
-#define CAPTURING_MOVE 1
-
 typedef enum 
 {
-    State_WhiteQueenSideCastleAvailable = 0x1,
-    State_WhiteKingSideCastleAvailable = 0x2,
-    State_BlackQueenSideCastleAvailable = 0x4,
-    State_BlackKingSideCastleAvailable = 0x8,
-    State_EnPassantAvailable = 0x10,
-    State_WhiteToPlay = 0x20
-} State;
+    BoardState_WhiteQueenSideCastleAvailable = 0x1,
+    BoardState_WhiteKingSideCastleAvailable = 0x2,
+    BoardState_BlackQueenSideCastleAvailable = 0x4,
+    BoardState_BlackKingSideCastleAvailable = 0x8,
+    BoardState_EnPassantAvailable = 0x10,
+    BoardState_WhiteToPlay = 0x20,
+    BoardState_HasCheck = 0x40,
+    BoardState_HasMate = 0x80,
+} BoardState;
 
 typedef struct Board 
 {
@@ -45,33 +45,105 @@ typedef struct Board
     uint8_t state;
 } Board;
 
-typedef enum
-{
-    BoardMoveError_PieceDoesNotExist = 1,
-    BoardMoveError_PieceCantMoveThere = 2,
-    BoardMoveError_PieceCantCapture = 3,
-} BoardMoveError;
+#define SIDE_TO_PLAY_WHITE 0
+#define SIDE_TO_PLAY_BLACK 1
+
+#define BOARD_GET_SIDE_TO_PLAY(board) ((board).state & BoardState_WhiteToPlay)
+#define BOARD_TOGGLE_SIDE_TO_PLAY(board) ((board).state ^= BoardState_WhiteToPlay)
+#define BOARD_SET_CHECK(board) ((board).state &= BoardState_HasCheck)
+#define BOARD_SET_MATE(board) ((board).state &= BoardState_HasMate)
+#define BOARD_HAS_CHECK(board) ((board).state & BoardState_HasCheck)
+#define BOARD_HAS_MATE(board) ((board).state & BoardState_HasMate)
+
+#define BOARD_GET_WHITE_PIECES(board) ((board).pawns[0] |   \
+                                       (board).knights[0] | \
+                                       (board).bishops[0] | \
+                                       (board).rooks[0] |   \
+                                       (board).queens[0] |  \
+                                       (board).kings[0])
+
+#define BOARD_PTR_GET_WHITE_PIECES(board) (board->pawns[0] |   \
+                                           board->knights[0] | \
+                                           board->bishops[0] | \
+                                           board->rooks[0] |   \
+                                           board->queens[0] |  \
+                                           board->kings[0])
+
+#define BOARD_GET_BLACK_PIECES(board) ((board).pawns[1] |   \
+                                       (board).knights[1] | \
+                                       (board).bishops[1] | \
+                                       (board).rooks[1] |   \
+                                       (board).queens[1] |  \
+                                       (board).kings[1])
+
+#define BOARD_PTR_GET_BLACK_PIECES(board) (board->pawns[1] |   \
+                                           board->knights[1] | \
+                                           board->bishops[1] | \
+                                           board->rooks[1] |   \
+                                           board->queens[1] |  \
+                                           board->kings[1])
 
 typedef enum
 {
-    IteratorMoveType_White = 1,
-    IteratorMoveType_Black = 2,
-    IteratorMoveType_All = 3
-} IteratorMoveType;
+    BoardMoveError_PieceDoesNotExist = 1,
+    BoardMoveError_PieceAlreadyOnThisSquare = 2,
+    BoardMoveError_PieceCantMoveThere = 3,
+    BoardMoveError_NoPieceToCapture = 4,
+    BoardMoveError_PieceWrongSide= 5,
+} BoardMoveError;
+
 
 CCHESS_API Board board_init();
 
 CCHESS_API Board board_from_fen(const char* fen);
 
-CCHESS_API uint32_t board_has_piece(Board* board,
-                                    const uint32_t piece,
-                                    const uint32_t square);
+CCHESS_FORCE_INLINE bool board_has_piece(Board* board,
+                                         const uint32_t piece,
+                                         const uint32_t square,
+                                         const uint32_t side)
+{
+    const uint64_t piece_mask = 1ULL << square;
 
-CCHESS_API uint32_t board_make_move(Board* board, Move move);
+    uint64_t* board_as_ptr = (uint64_t*)board;
 
-CCHESS_API void board_make_move_no_check(Board* board, Move move);
+    return board_as_ptr[piece * 2UL + side] & piece_mask;
+}
 
-CCHESS_API bool board_legal_moves_iterator(Board* board, Move* move, IteratorMoveType move_type);
+CCHESS_API uint64_t board_get_move_mask_all_pieces(Board* board, const uint32_t side);
+
+CCHESS_API uint32_t board_make_move(Board* board, const Move move);
+
+/* 
+    Does not do any check to make sure the move is valid, made to be used by the chess engine itself 
+    Used in perft, evaluation, and others places where moves don't need to be sanitized. 
+    It though has asserts to sanitize the function in debug mode
+*/
+CCHESS_API void board_make_move_unsafe(Board* board, const Move move);
+
+CCHESS_API uint32_t board_make_move_algebraic(Board* board, const char* move);
+
+CCHESS_API bool board_has_check_from_last_move(Board* board, const Move last_move);
+
+CCHESS_API bool board_has_check(Board* board);
+
+typedef enum
+{
+    BoardMoveIteratorFlag_PieceWhite = 0x1,
+    BoardMoveIteratorFlag_PieceBlack = 0x2,
+} BoardMoveIteratorFlag;
+
+typedef struct
+{
+    uint8_t piece_type;
+    uint8_t side;
+    uint8_t piece;
+    uint8_t move;
+    uint32_t flags;
+} BoardMoveIterator;
+
+CCHESS_API BoardMoveIterator board_move_iterator_init();
+
+CCHESS_API bool board_legal_moves_iterator(Board* board, Move* move, BoardMoveIterator* it);
 
 CCHESS_API uint64_t board_perft(Board* board, uint32_t num_plies);
 

@@ -5,9 +5,9 @@
 
 #include "cchess/cchess.h"
 
-#define BIT64(bit) ((uint64_t)1 << (bit))
+#define BIT64(bit) ((uint64_t)1ULL << (bit))
 
-#define BIT32(bit) ((uint32_t)1 << (bit))
+#define BIT32(bit) ((uint32_t)1UL << (bit))
 
 #define HAS_BIT(flag, bit) ((flag) & (bit))
 
@@ -18,8 +18,6 @@
 
 #if defined(CCHESS_WIN)
 #include <intrin.h>
-#elif defined(CCHESS_GCC)
-#include <immintrin.h>
 #endif /* defined(CCHESS_WIN) */
 
 CCHESS_FORCE_INLINE uint64_t popcount_u32(const uint32_t x)
@@ -61,10 +59,10 @@ CCHESS_FORCE_INLINE uint32_t clz_u64(const uint64_t x)
 
     if(_BitScanReverse64(&trailing_zero, x))
     {
-        return 63 - trailing_zero;
+        return 63UL - trailing_zero;
     }
 
-    return 32;
+    return 32UL;
 #elif defined(CCHESS_GCC)
     return __builtin_clzll(x);
 #endif /* defined(CCHESS_MSVC) */
@@ -73,14 +71,14 @@ CCHESS_FORCE_INLINE uint32_t clz_u64(const uint64_t x)
 CCHESS_FORCE_INLINE uint32_t ctz_u64(const uint64_t x)
 {
 #if defined(CCHESS_MSVC)
-    unsigned long trailing_zero = 0;
+    unsigned long trailing_zero = 0UL;
 
     if(_BitScanForward64(&trailing_zero, x))
     {
         return trailing_zero;
     }
 
-    return 63;
+    return 63UL;
 #elif defined(CCHESS_GCC)
     return __builtin_ctzll(x);
 #endif /* defined(CCHESS_MSVC) */
@@ -98,25 +96,25 @@ CCHESS_FORCE_INLINE uint64_t pext_u64(const uint64_t x, const uint64_t y)
 
 CCHESS_FORCE_INLINE uint8_t abs_u8(const int8_t x)
 {
-    const uint8_t mask = x >> 7;
+    const uint8_t mask = x >> 7U;
     return (uint8_t)((mask ^ x) - mask);
 }
 
 CCHESS_FORCE_INLINE uint16_t abs_u16(const int16_t x)
 {
-    const uint16_t mask = x >> 15;
+    const uint16_t mask = x >> 15U;
     return (uint16_t)((mask ^ x) - mask);
 }
 
 CCHESS_FORCE_INLINE uint32_t abs_u32(const int32_t x)
 {
-    const uint32_t mask = x >> 31;
+    const uint32_t mask = x >> 31U;
     return (uint32_t)((mask ^ x) - mask);
 }
 
 CCHESS_FORCE_INLINE uint64_t abs_u64(const int64_t x)
 {
-    const uint64_t mask = x >> 63;
+    const uint64_t mask = x >> 63U;
     return (uint64_t)((mask ^ x) - mask);
 }
 
@@ -127,7 +125,7 @@ CCHESS_FORCE_INLINE uint64_t lsb_u64(const uint64_t x)
 
 CCHESS_FORCE_INLINE uint64_t clsb_u64(const uint64_t x)
 {
-    return x & (x - 1);
+    return x & (x - 1ULL);
 }
 
 #endif /* !defined(__BITUTILS) */

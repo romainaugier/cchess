@@ -47,6 +47,7 @@ CCHESS_API uint64_t __files(const uint32_t file);
 #define INITIAL_BLACK_KING (uint64_t)0x1000000000000000
 
 #define BOARD_BIT(i, j) (BIT64(((i) + (j) * 8)))
+#define BOARD_BIT_FROM_SQUARE(s) (1ULL << (s))
 #define BOARD_HAS_BIT(b, i, j) (HAS_BIT(b, BOARD_BIT(i, j)))
 #define BOARD_SET_BIT(b, i, j) (SET_BIT(b, BOARD_BIT(i, j)))
 #define BOARD_UNSET_BIT(b, i, j) (UNSET_BIT(b, BOARD_BIT(i, j)))

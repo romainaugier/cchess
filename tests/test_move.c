@@ -1,6 +1,8 @@
 #include "cchess/board.h"
 #include "cchess/move.h"
 
+#include "libromano/logger.h"
+
 #define ROMANO_ENABLE_PROFILING
 #include "libromano/profiling.h"
 
@@ -11,6 +13,8 @@
 int main(int argc, char** argv)
 {
     CCHESS_ATEXIT_REGISTER(move_gen_destroy, true);
+
+    logger_init();
 
     move_gen_init();
 
@@ -25,12 +29,13 @@ int main(int argc, char** argv)
     SCOPED_PROFILE_START_MICROSECONDS(legal_moves);
 
     Move m;
+    BoardMoveIterator move_it = board_move_iterator_init();
 
     uint32_t plies = 1;
 
     uint64_t num_moves = 0;
 
-    while(board_legal_moves_iterator(&b, &m, IteratorMoveType_All))
+    while(board_legal_moves_iterator(&b, &m, &move_it))
     {
         num_moves++;
     };
@@ -39,8 +44,14 @@ int main(int argc, char** argv)
 
     printf("Num moves found for %u plies: %llu\n", plies, num_moves);
 
-    const uint64_t bishop_moves = move_gen_bishop(8, 0, 0, 0);
-    board_debug_move_mask(bishop_moves, 8);
+    logger_log(LogLevel_Info, "Starting perft test");
+
+    for(uint32_t i = 1; i < 7; i++)
+    {
+        logger_log(LogLevel_Info, "Perft %u: %llu", i, board_perft(&b, i));
+    }
+
+    logger_release();
 
     return 0;
 }
