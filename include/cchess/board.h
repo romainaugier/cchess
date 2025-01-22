@@ -5,6 +5,7 @@
 
 #include "cchess/cchess.h"
 #include "cchess/move.h"
+#include "cchess/bit_utils.h"
 
 typedef enum 
 {
@@ -97,6 +98,61 @@ CCHESS_API Board board_init();
 
 CCHESS_API Board board_from_fen(const char* fen);
 
+CCHESS_FORCE_INLINE uint64_t board_get_pawns(Board* board, const uint64_t side)
+{
+    return board->pawns[side];
+}
+
+CCHESS_FORCE_INLINE uint64_t board_num_pawns(Board* board, const uint64_t side)
+{
+    return popcount_u64(board->pawns[side]);
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_knights(Board* board, const uint64_t side)
+{
+    return board->knights[side];
+}
+
+CCHESS_FORCE_INLINE uint64_t board_num_knights(Board* board, const uint64_t side)
+{
+    return popcount_u64(board->knights[side]);
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_bishops(Board* board, const uint64_t side)
+{
+    return board->bishops[side];
+}
+
+CCHESS_FORCE_INLINE uint64_t board_num_bishops(Board* board, const uint64_t side)
+{
+    return popcount_u64(board->bishops[side]);
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_rooks(Board* board, const uint64_t side)
+{
+    return board->rooks[side];
+}
+
+CCHESS_FORCE_INLINE uint64_t board_num_rooks(Board* board, const uint64_t side)
+{
+    return popcount_u64(board->rooks[side]);
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_queens(Board* board, const uint64_t side)
+{
+    return board->queens[side];
+}
+
+CCHESS_FORCE_INLINE uint64_t board_num_queens(Board* board, const uint64_t side)
+{
+    return popcount_u64(board->queens[side]);
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_king(Board* board, const uint64_t side)
+{
+    return board->kings[side];
+}
+
 CCHESS_FORCE_INLINE bool board_has_piece(Board* board,
                                          const uint32_t piece,
                                          const uint32_t square,
@@ -109,7 +165,9 @@ CCHESS_FORCE_INLINE bool board_has_piece(Board* board,
     return board_as_ptr[piece * 2UL + side] & piece_mask;
 }
 
-CCHESS_API uint64_t board_get_move_mask_all_pieces(Board* board, const uint32_t side);
+CCHESS_API bool board_move_is_legal(Board* board, const Move move);
+
+CCHESS_API bool board_move_is_legal_algebraic(Board* board, const char* move);
 
 CCHESS_API uint32_t board_make_move(Board* board, const Move move);
 
@@ -125,6 +183,10 @@ CCHESS_API uint32_t board_make_move_algebraic(Board* board, const char* move);
 CCHESS_API bool board_has_check_from_last_move(Board* board, const Move last_move);
 
 CCHESS_API bool board_has_check(Board* board);
+
+CCHESS_API bool board_has_mate_from_last_move(Board* board, Move last_move);
+
+CCHESS_API bool board_has_mate(Board* board);
 
 typedef enum
 {
@@ -150,6 +212,8 @@ CCHESS_API uint64_t board_perft(Board* board, uint32_t num_plies);
 CCHESS_API void board_debug(Board* board);
 
 CCHESS_API void board_debug_move_masks(Board* board);
+
+CCHESS_API void board_debug_mask(uint64_t mask);
 
 CCHESS_API void board_debug_move_mask(uint64_t mask, uint64_t square);
 

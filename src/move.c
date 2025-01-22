@@ -4,6 +4,8 @@
 
 #include "libromano/memory.h"
 
+#include <string.h>
+
 CCHESS_FORCE_INLINE uint64_t move_gen_pawn_mask(const uint32_t square, const uint32_t side)
 {
     const uint64_t rank = BOARD_RANK_FROM_POS(square);
@@ -141,7 +143,7 @@ CCHESS_FORCE_INLINE uint64_t move_gen_rook_mask_with_blockers(const uint32_t squ
 
     uint64_t mask = 0ULL;
     
-    for(int32_t f = file + 1; f < 7; f++)
+    for(int32_t f = file + 1; f < 8; f++)
     {
         const uint64_t pos = 1ULL << (rank * 8 + f);
         mask |= pos;
@@ -149,7 +151,7 @@ CCHESS_FORCE_INLINE uint64_t move_gen_rook_mask_with_blockers(const uint32_t squ
         if(blockers & pos) break;
     }
 
-    for(int32_t f = file - 1; f > 0; f--)
+    for(int32_t f = file - 1; f >= 0; f--)
     {
         const uint64_t pos = 1ULL << (rank * 8 + f);
         mask |= pos;
@@ -157,7 +159,7 @@ CCHESS_FORCE_INLINE uint64_t move_gen_rook_mask_with_blockers(const uint32_t squ
         if(blockers & pos) break;
     }
         
-    for(int32_t r = rank + 1; r < 7; r++)
+    for(int32_t r = rank + 1; r < 8; r++)
     {
         const uint64_t pos = 1ULL << (r * 8 + file);
         mask |= pos;
@@ -165,7 +167,7 @@ CCHESS_FORCE_INLINE uint64_t move_gen_rook_mask_with_blockers(const uint32_t squ
         if(blockers & pos) break;
     }
 
-    for(int32_t r = rank - 1; r > 0; r--)
+    for(int32_t r = rank - 1; r >= 0; r--)
     {
         const uint64_t pos = 1ULL << (r * 8 + file);
         mask |= pos;
@@ -217,19 +219,19 @@ static uint64_t* _bishop_moves_lookup = NULL;
 
 void gen_blockers(const uint64_t mask, uint64_t* blockers)
 {
-    uint32_t bits = popcount_u64(mask);
-    uint32_t num_blockers = 1 << bits;
+    uint64_t bits = popcount_u64(mask);
+    uint64_t num_blockers = 1ULL << bits;
 
     for(uint32_t i = 0; i < num_blockers; i++)
     {
-        blockers[i] = 0;
+        blockers[i] = 0ULL;
 
         uint64_t temp_mask = mask;
-        uint32_t bit_index = 0;
+        uint64_t bit_index = 0ULL;
 
         while(temp_mask)
         {
-            uint32_t lsb = lsb_u64(temp_mask);
+            uint64_t lsb = ctz_u64(temp_mask);
 
             if(i & (1ULL << bit_index))
             {
@@ -255,6 +257,7 @@ void move_gen_init(void)
             _rook_moves_lookup[i] = mask;
 
             uint64_t blockers[ROOK_NUM_BLOCKERS];
+            memset(blockers, 0, sizeof(blockers));
             gen_blockers(mask, blockers);
 
             for(uint32_t j = 0; j < ROOK_NUM_BLOCKERS; j++)
@@ -276,6 +279,7 @@ void move_gen_init(void)
             _bishop_moves_lookup[i] = mask;
 
             uint64_t blockers[BISHOP_NUM_BLOCKERS];
+            memset(blockers, 0, sizeof(blockers));
             gen_blockers(mask, blockers);
 
             for(uint32_t j = 0; j < BISHOP_NUM_BLOCKERS; j++)
@@ -311,11 +315,11 @@ uint64_t move_gen_pawn(const uint32_t square,
 
     if(side == 0)
     {
-        moves |= ((board_bit << 7) & (board_bit << 9) & blockers_black); 
+        moves |= (((board_bit << 7) | (board_bit << 9)) & blockers_black); 
     }
     else
     {
-        moves |= ((board_bit >> 7) & (board_bit >> 9) & blockers_white);        
+        moves |= (((board_bit >> 7) | (board_bit >> 9)) & blockers_white);        
     }
 
     return moves;
@@ -339,9 +343,8 @@ uint64_t move_gen_bishop(const uint32_t square,
     const uint64_t mask = _bishop_moves_lookup[square];
     const uint64_t blockers_mask = mask & (blockers_white | blockers_black);
     const uint64_t index = pext_u64(blockers_mask, mask);
-    const uint64_t pieces_mask = side == 0 ? blockers_white : blockers_black;
 
-    return _bishop_moves_lookup[64 + square * BISHOP_NUM_BLOCKERS + index] & ~pieces_mask;
+    return _bishop_moves_lookup[64 + square * BISHOP_NUM_BLOCKERS + index] & (side == 0 ? ~blockers_white : ~blockers_black) ;
 }
 
 uint64_t move_gen_rook(const uint32_t square,
@@ -354,9 +357,8 @@ uint64_t move_gen_rook(const uint32_t square,
     const uint64_t mask = _rook_moves_lookup[square];
     const uint64_t blockers_mask = mask & (blockers_white | blockers_black);
     const uint64_t index = pext_u64(blockers_mask, mask);
-    const uint64_t pieces_mask = side == 0 ? blockers_white : blockers_black;
 
-    return _rook_moves_lookup[64 + square * ROOK_NUM_BLOCKERS + index] & ~pieces_mask;
+    return _rook_moves_lookup[64 + square * ROOK_NUM_BLOCKERS + index] & (side == 0 ? ~blockers_white : ~blockers_black);
 }
 
 uint64_t move_gen_queen(const uint32_t square,

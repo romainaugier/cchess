@@ -48,9 +48,12 @@ CCHESS_API uint64_t __files(const uint32_t file);
 
 #define BOARD_BIT(i, j) (BIT64(((i) + (j) * 8)))
 #define BOARD_BIT_FROM_SQUARE(s) (1ULL << (s))
-#define BOARD_HAS_BIT(b, i, j) (HAS_BIT(b, BOARD_BIT(i, j)))
-#define BOARD_SET_BIT(b, i, j) (SET_BIT(b, BOARD_BIT(i, j)))
-#define BOARD_UNSET_BIT(b, i, j) (UNSET_BIT(b, BOARD_BIT(i, j)))
+#define BOARD_HAS_BIT(b, s) (HAS_BIT((b), BIT64((s))))
+#define BOARD_SET_BIT(b, s) (SET_BIT((b), BIT64((s))))
+#define BOARD_UNSET_BIT(b, s) (UNSET_BIT((b), BIT64((s))))
+#define BOARD_HAS_BIT_FROM_FILE_RANK(b, i, j) (HAS_BIT(b, BOARD_BIT(i, j)))
+#define BOARD_SET_BIT_FROM_FILE_RANK(b, i, j) (SET_BIT(b, BOARD_BIT(i, j)))
+#define BOARD_UNSET_BIT_FROM_FILE_RANK(b, i, j) (UNSET_BIT(b, BOARD_BIT(i, j)))
 
 #define BOARD_FILE_FROM_POS(p) (p % 8)
 #define BOARD_RANK_FROM_POS(p) (p / 8)
@@ -65,5 +68,9 @@ CCHESS_API uint64_t __anti_diagonals(const uint32_t file, const uint32_t rank);
 
 #define BOARD_GET_MAIN_DIAGONAL(f, r) (__main_diagonals(f, r))
 #define BOARD_GET_ANTI_DIAGONAL(f, r) (__anti_diagonals(f, r))
+
+#define SIZEOF_DEBUG_BOARD (10 * 22 + 1)
+
+CCHESS_API void board_debug_mask(const uint64_t mask);
 
 #endif /* !defined(__BOARD_MACROS) */

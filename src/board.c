@@ -84,11 +84,11 @@ Board board_from_fen(const char* fen)
             const uint8_t piece_num = abs_u8(piece) - 1;
             const uint32_t b_index = (piece_num + side) * 2 - side;
 
-            BOARD_SET_BIT(b_ptr[b_index], current_file, current_rank);
+            BOARD_SET_BIT_FROM_FILE_RANK(b_ptr[b_index], current_file, current_rank);
         }
         else if(is_digit(*s))
         {
-            const uint8_t d = to_digit(*s) - 1;
+            const uint8_t d = to_digit(*s);
 
             current_file += d;
 
@@ -176,6 +176,11 @@ uint64_t board_get_move_mask_all_pieces(Board* board, const uint32_t side)
     }
 
     return mask;
+}
+
+uint64_t board_get_pinned_pieces(Board* board, const uint32_t side)
+{
+    return 0;
 }
 
 uint32_t board_make_move(Board* board, const Move move)
@@ -291,6 +296,26 @@ bool board_has_check_from_last_move(Board* board, Move last_move)
 }
 
 bool board_has_check(Board* board)
+{
+    const uint32_t side = BOARD_GET_SIDE_TO_PLAY(*board);
+    const uint64_t king_mask = board->kings[!side];
+    const uint64_t attack_mask = board_get_move_mask_all_pieces(board, side);
+
+    return king_mask & attack_mask;
+}
+
+bool board_has_mate_from_last_move(Board* board, Move last_move)
+{
+    const uint64_t white_pieces = BOARD_PTR_GET_WHITE_PIECES(board);
+    const uint64_t black_pieces = BOARD_PTR_GET_BLACK_PIECES(board);
+
+    const uint32_t to_square = MOVE_GET_TO_SQUARE(last_move);
+    const uint32_t piece = MOVE_GET_PIECE(last_move);
+    const uint32_t side = BOARD_GET_SIDE_TO_PLAY(*board);
+    return false;
+}
+
+bool board_has_mate(Board* board)
 {
     return false;
 }
@@ -467,37 +492,53 @@ uint64_t board_perft(Board* board, uint32_t num_plies)
 
 /* Debug */
 
-#define SIZEOF_DEBUG_BOARD (64 + 8 + 1)
-
 #define PIECES_STRING ("PpNnBbRrQqKk")
 
 void board_debug(Board* board)
 {
     char res[SIZEOF_DEBUG_BOARD];
-    memset(res, ' ', SIZEOF_DEBUG_BOARD * sizeof(char));
+    memset(res, ' ', SIZEOF_DEBUG_BOARD - 1);
     res[SIZEOF_DEBUG_BOARD - 1] = '\0';
 
-    printf("cchess board:\n");
+    for (int i = 0; i < 10; i++) {
+        res[i * 22 + 21] = '\n';
+    }
 
-    for(int64_t j = 7; j >= 0; j--)
+    const char *files = "abcdefgh";
+
+    for(int i = 0; i < 8; i++) 
     {
-        for(uint64_t i = 0; i < 8; i++)
+        res[3 + i * 2] = files[i];
+        res[9 * 22 + 3 + i * 2] = files[i];
+    }
+
+    for(int line = 1; line <= 8; line++) 
+    {
+        int rank = 9 - line;
+        char rank_char = '0' + rank;
+        int line_start = line * 22;
+        res[line_start] = rank_char;
+        res[line_start + 20] = rank_char;
+    }
+
+    for(int64_t jj = 7; jj >= 0; jj--) 
+    {
+        int line = 1 + (7 - jj);
+        int line_start = line * 22;
+
+        for(uint64_t ii = 0; ii < 8; ii++) 
         {
             for(uint64_t k = 0; k < 12; k++)
             {
                 const uint64_t b = ((uint64_t*)board)[k];
 
-                if(BOARD_HAS_BIT(b, i, j))
+                if(BOARD_HAS_BIT_FROM_FILE_RANK(b, ii, jj))
                 {
-                    res[i + (7 - j) * 9] = PIECES_STRING[k];
+                    int pos = line_start + 3 + ii * 2;
+                    res[pos] = PIECES_STRING[k];
                 }
             }
         }
-    }
-
-    for(uint64_t i = 0; i < 8; i++)
-    {
-        res[8 + i * 9] = '\n';
     }
 
     printf(res);
@@ -571,10 +612,6 @@ void board_debug_move_masks(Board* board)
                                                                     white_pieces,
                                                                     black_pieces); 
 
-                char res[SIZEOF_DEBUG_BOARD];
-                memset(res, ' ', SIZEOF_DEBUG_BOARD * sizeof(char));
-                res[SIZEOF_DEBUG_BOARD - 1] = '\0';
-
                 const uint32_t file = BOARD_FILE_FROM_POS(piece_index);
                 const uint32_t rank = BOARD_RANK_FROM_POS(piece_index);
 
@@ -587,26 +624,7 @@ void board_debug_move_masks(Board* board)
 
                 printf("\n");
 
-                for(int64_t jj = 7; jj >= 0; jj--)
-                {
-                    for(uint64_t ii = 0; ii < 8; ii++)
-                    {
-                        if(BOARD_HAS_BIT(move_mask, ii, jj))
-                        {
-                            res[ii + (7 - jj) * 9] = 'o';
-                        }
-                    }
-                }
-
-                // res[(file) + (7 - rank) * 9] = 'x';
-
-                for(uint64_t ii = 0; ii < 8; ii++)
-                {
-                    res[8 + ii * 9] = '\n';
-                }
-
-                printf(res);
-                printf("\n");
+                board_debug_mask(move_mask);
 
                 UNSET_BIT(b, BIT64(piece_index));
             }
@@ -617,32 +635,50 @@ void board_debug_move_masks(Board* board)
 void board_debug_move_mask(uint64_t mask, uint64_t square)
 {
     char res[SIZEOF_DEBUG_BOARD];
-    memset(res, ' ', SIZEOF_DEBUG_BOARD * sizeof(char));
+    memset(res, ' ', SIZEOF_DEBUG_BOARD - 1);
     res[SIZEOF_DEBUG_BOARD - 1] = '\0';
 
-    const uint32_t file = BOARD_FILE_FROM_POS(square);
-    const uint32_t rank = BOARD_RANK_FROM_POS(square);
+    for (int i = 0; i < 10; i++) {
+        res[i * 22 + 21] = '\n';
+    }
 
-    printf("\n");
+    const char *files = "abcdefgh";
 
-    for(int64_t jj = 7; jj >= 0; jj--)
+    for(int i = 0; i < 8; i++) 
     {
-        for(uint64_t ii = 0; ii < 8; ii++)
+        res[3 + i * 2] = files[i];
+        res[9 * 22 + 3 + i * 2] = files[i];
+    }
+
+    for(int line = 1; line <= 8; line++) 
+    {
+        int rank = 9 - line;
+        char rank_char = '0' + rank;
+        int line_start = line * 22;
+        res[line_start] = rank_char;
+        res[line_start + 20] = rank_char;
+    }
+
+    for(int64_t jj = 7; jj >= 0; jj--) 
+    {
+        int line = 1 + (7 - jj);
+        int line_start = line * 22;
+
+        for(uint64_t ii = 0; ii < 8; ii++) 
         {
-            if(BOARD_HAS_BIT(mask, ii, jj))
+            if(BOARD_HAS_BIT_FROM_FILE_RANK(mask, ii, jj))
             {
-                res[ii + (7 - jj) * 9] = 'o';
+                int pos = line_start + 3 + ii * 2;
+                res[pos] = 'o';
             }
         }
     }
 
-    res[(file) + (7 - rank) * 9] = 'x';
+    const uint32_t file = BOARD_FILE_FROM_POS(square);
+    const uint32_t rank = BOARD_RANK_FROM_POS(square);
 
-    for(uint64_t ii = 0; ii < 8; ii++)
-    {
-        res[8 + ii * 9] = '\n';
-    }
+    const int pos = (8 - rank) * 22 + 3 + file * 2;
+    res[pos] = 'x';
 
-    printf(res);
-    printf("\n");
+    printf("\n%s\n", res);
 }

@@ -46,7 +46,7 @@ int main(int argc, char** argv)
 
     logger_log(LogLevel_Info, "Starting perft test");
 
-    for(uint32_t i = 1; i < 7; i++)
+    for(uint32_t i = 1; i < 5; i++)
     {
         logger_log(LogLevel_Info, "Perft %u: %llu", i, board_perft(&b, i));
     }

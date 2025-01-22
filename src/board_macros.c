@@ -1,4 +1,5 @@
 #include "cchess/board_macros.h"
+#include "cchess/bit_utils.h"
 
 static const char* const _piece_as_string[6] = {
     "Pawn",
@@ -74,4 +75,49 @@ uint64_t __main_diagonals(const uint32_t file, const uint32_t rank)
 uint64_t __anti_diagonals(const uint32_t file, const uint32_t rank)
 {
     return _anti_diagonals[(7 - file) + rank];
+}
+
+void board_debug_mask(const uint64_t mask)
+{
+    char res[SIZEOF_DEBUG_BOARD];
+    memset(res, ' ', SIZEOF_DEBUG_BOARD - 1);
+    res[SIZEOF_DEBUG_BOARD - 1] = '\0';
+
+    for (int i = 0; i < 10; i++) {
+        res[i * 22 + 21] = '\n';
+    }
+
+    const char *files = "abcdefgh";
+
+    for(int i = 0; i < 8; i++) 
+    {
+        res[3 + i * 2] = files[i];
+        res[9 * 22 + 3 + i * 2] = files[i];
+    }
+
+    for(int line = 1; line <= 8; line++) 
+    {
+        int rank = 9 - line;
+        char rank_char = '0' + rank;
+        int line_start = line * 22;
+        res[line_start] = rank_char;
+        res[line_start + 20] = rank_char;
+    }
+
+    for(int64_t jj = 7; jj >= 0; jj--) 
+    {
+        int line = 1 + (7 - jj);
+        int line_start = line * 22;
+
+        for(uint64_t ii = 0; ii < 8; ii++) 
+        {
+            if(BOARD_HAS_BIT_FROM_FILE_RANK(mask, ii, jj))
+            {
+                int pos = line_start + 3 + ii * 2;
+                res[pos] = 'o';
+            }
+        }
+    }
+
+    printf("\n%s\n", res);
 }
