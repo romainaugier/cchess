@@ -49,12 +49,21 @@ typedef struct Board
 #define SIDE_TO_PLAY_WHITE 0
 #define SIDE_TO_PLAY_BLACK 1
 
+#define BOARD_MAX_MOVES 256
+
 #define BOARD_GET_SIDE_TO_PLAY(board) ((board).state & BoardState_WhiteToPlay)
 #define BOARD_TOGGLE_SIDE_TO_PLAY(board) ((board).state ^= BoardState_WhiteToPlay)
 #define BOARD_SET_CHECK(board) ((board).state &= BoardState_HasCheck)
 #define BOARD_SET_MATE(board) ((board).state &= BoardState_HasMate)
 #define BOARD_HAS_CHECK(board) ((board).state & BoardState_HasCheck)
 #define BOARD_HAS_MATE(board) ((board).state & BoardState_HasMate)
+
+#define BOARD_PTR_GET_SIDE_TO_PLAY(board) (board->state & BoardState_WhiteToPlay)
+#define BOARD_PTR_TOGGLE_SIDE_TO_PLAY(board) (board->state ^= BoardState_WhiteToPlay)
+#define BOARD_PTR_SET_CHECK(board) (board->state &= BoardState_HasCheck)
+#define BOARD_PTR_SET_MATE(board) (board->state &= BoardState_HasMate)
+#define BOARD_PTR_HAS_CHECK(board) (board->state & BoardState_HasCheck)
+#define BOARD_PTR_HAS_MATE(board) (board->state & BoardState_HasMate)
 
 #define BOARD_GET_WHITE_PIECES(board) ((board).pawns[0] |   \
                                        (board).knights[0] | \
@@ -164,6 +173,8 @@ CCHESS_FORCE_INLINE bool board_has_piece(Board* board,
 
     return board_as_ptr[piece * 2UL + side] & piece_mask;
 }
+
+CCHESS_API void board_get_moves(Board* board, Move* moves, size_t* moves_count);
 
 CCHESS_API bool board_move_is_legal(Board* board, const Move move);
 

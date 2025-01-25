@@ -183,6 +183,13 @@ uint64_t board_get_pinned_pieces(Board* board, const uint32_t side)
     return 0;
 }
 
+void board_get_moves(Board* board, Move* moves, size_t* moves_count)
+{
+    *moves_count = 0;
+
+    const uint32_t side = BOARD_PTR_GET_SIDE_TO_PLAY(board);
+}
+
 uint32_t board_make_move(Board* board, const Move move)
 {
     const uint32_t piece = MOVE_GET_PIECE(move);
@@ -312,6 +319,7 @@ bool board_has_mate_from_last_move(Board* board, Move last_move)
     const uint32_t to_square = MOVE_GET_TO_SQUARE(last_move);
     const uint32_t piece = MOVE_GET_PIECE(last_move);
     const uint32_t side = BOARD_GET_SIDE_TO_PLAY(*board);
+
     return false;
 }
 

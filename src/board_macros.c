@@ -1,6 +1,9 @@
 #include "cchess/board_macros.h"
 #include "cchess/bit_utils.h"
 
+#include <stdio.h>
+#include <string.h>
+
 static const char* const _piece_as_string[6] = {
     "Pawn",
     "Knight",
