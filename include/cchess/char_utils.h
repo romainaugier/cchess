@@ -45,7 +45,7 @@ CCHESS_FORCE_INLINE char to_upper(unsigned int c)
     return c & ~0x20;
 }
 
-CCHESS_FORCE_INLINE uint8_t to_digit(unsigned int c)
+CCHESS_FORCE_INLINE uint32_t to_digit(unsigned int c)
 {
     return c - 0x30;
 }

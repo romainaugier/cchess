@@ -96,10 +96,10 @@ CCHESS_FORCE_INLINE uint64_t pext_u64(const uint64_t x, const uint64_t y)
     return _pext_u64(x, y);
 }
 
-CCHESS_FORCE_INLINE uint8_t abs_u8(const int8_t x)
+CCHESS_FORCE_INLINE uint32_t abs_u8(const int8_t x)
 {
-    const uint8_t mask = x >> 7U;
-    return (uint8_t)((mask ^ x) - mask);
+    const uint32_t mask = x >> 7U;
+    return (uint32_t)((mask ^ x) - mask);
 }
 
 CCHESS_FORCE_INLINE uint16_t abs_u16(const int16_t x)

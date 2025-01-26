@@ -43,7 +43,15 @@ typedef struct Board
     uint64_t queens[2];
     uint64_t kings[2];
 
-    uint8_t state;
+    uint64_t whites;
+    uint64_t blacks;
+
+    uint64_t white_attacks;
+    uint64_t black_attacks;
+
+    uint64_t all;
+
+    uint32_t state;
 } Board;
 
 #define SIDE_TO_PLAY_WHITE 0
@@ -162,6 +170,31 @@ CCHESS_FORCE_INLINE uint64_t board_get_king(Board* board, const uint64_t side)
     return board->kings[side];
 }
 
+CCHESS_FORCE_INLINE uint64_t board_get_white(Board* board)
+{
+    return board->whites;
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_black(Board* board)
+{
+    return board->blacks;
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_white_attacks(Board* board)
+{
+    return board->white_attacks;
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_black_attacks(Board* board)
+{
+    return board->black_attacks;
+}
+
+CCHESS_FORCE_INLINE uint64_t board_get_all(Board* board)
+{
+    return board->all;
+}
+
 CCHESS_FORCE_INLINE bool board_has_piece(Board* board,
                                          const uint32_t piece,
                                          const uint32_t square,
@@ -182,20 +215,13 @@ CCHESS_API bool board_move_is_legal_algebraic(Board* board, const char* move);
 
 CCHESS_API uint32_t board_make_move(Board* board, const Move move);
 
-/* 
-    Does not do any check to make sure the move is valid, made to be used by the chess engine itself 
-    Used in perft, evaluation, and others places where moves don't need to be sanitized. 
-    It though has asserts to sanitize the function in debug mode
-*/
-CCHESS_API void board_make_move_unsafe(Board* board, const Move move);
-
-CCHESS_API uint32_t board_make_move_algebraic(Board* board, const char* move);
+CCHESS_API bool board_make_move_algebraic(Board* board, const char* move);
 
 CCHESS_API bool board_has_check_from_last_move(Board* board, const Move last_move);
 
 CCHESS_API bool board_has_check(Board* board);
 
-CCHESS_API bool board_has_mate_from_last_move(Board* board, Move last_move);
+CCHESS_API bool board_has_mate_from_last_move(Board* board, const Move last_move);
 
 CCHESS_API bool board_has_mate(Board* board);
 
@@ -207,10 +233,10 @@ typedef enum
 
 typedef struct
 {
-    uint8_t piece_type;
-    uint8_t side;
-    uint8_t piece;
-    uint8_t move;
+    uint32_t piece_type;
+    uint32_t side;
+    uint32_t piece;
+    uint32_t move;
     uint32_t flags;
 } BoardMoveIterator;
 
