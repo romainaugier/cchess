@@ -1,8 +1,8 @@
 #include "cchess/move.h"
 #include "cchess/board_macros.h"
-#include "cchess/bit_utils.h"
 
 #include "libromano/memory.h"
+#include "libromano/bit.h"
 
 #include <string.h>
 
@@ -304,23 +304,53 @@ void move_gen_destroy(void)
     }
 }
 
-uint64_t move_gen_pawn(const uint32_t square,
-                       const uint32_t side,
-                       const uint64_t blockers_white,
-                       const uint64_t blockers_black)
+// uint64_t move_gen_pawn(const uint32_t square,
+//                        const uint32_t side,
+//                        const uint64_t blockers_white,
+//                        const uint64_t blockers_black)
+// {
+//     uint64_t moves = move_gen_pawn_mask(square, side) & ~(blockers_white | blockers_black);
+
+//     const uint64_t board_bit = BOARD_BIT_FROM_SQUARE(square);
+
+//     if(side == 0)
+//     {
+//         moves |= (((board_bit << 7) | (board_bit << 9)) & blockers_black); 
+//     }
+//     else
+//     {
+//         moves |= (((board_bit >> 7) | (board_bit >> 9)) & blockers_white);        
+//     }
+
+//     return moves;
+// }
+
+uint64_t move_gen_pawn(const uint32_t square, 
+                       const uint32_t side, 
+                       const uint64_t whites, 
+                       const uint64_t blacks) 
 {
-    uint64_t moves = move_gen_pawn_mask(square, side) & ~(blockers_white | blockers_black);
+    uint64_t moves = 0;
+    uint64_t all = whites | blacks;
+    uint64_t pawn = 1ULL << square;
+    uint64_t forward, double_forward, capture_left, capture_right;
 
-    const uint64_t board_bit = BOARD_BIT_FROM_SQUARE(square);
+    if (side == 0) 
+    {
+        forward = (pawn << 8) & ~all;
+        double_forward = (forward && (square >= 8 && square <= 15)) ? (pawn << 16) & ~all : 0;
+        capture_left = (pawn << 7) & blacks & ~RANK8 & ~FILEA;
+        capture_right = (pawn << 9) & blacks & ~RANK8 & ~FILEH;
+    } 
+    else 
+    {
+        forward = (pawn >> 8) & ~all;
+        double_forward = (forward && (square >= 48 && square <= 55)) ? (pawn >> 16) & ~all : 0;
+        capture_left = (pawn >> 7) & whites & ~RANK1 & ~FILEH;
+        capture_right = (pawn >> 9) & whites & ~RANK1 & ~FILEA;
+    }
 
-    if(side == 0)
-    {
-        moves |= (((board_bit << 7) | (board_bit << 9)) & blockers_black); 
-    }
-    else
-    {
-        moves |= (((board_bit >> 7) | (board_bit >> 9)) & blockers_white);        
-    }
+    moves = forward | double_forward | capture_left | capture_right;
 
     return moves;
 }

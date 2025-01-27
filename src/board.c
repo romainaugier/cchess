@@ -1,10 +1,26 @@
 #include "cchess/board.h"
-#include "cchess/bit_utils.h"
 #include "cchess/char_utils.h"
 #include "cchess/board_macros.h"
 
 #include <stdio.h>
 #include <string.h>
+
+#define BOARD_INIT_GROUPED_MASKS(board) \
+    board.whites = 0ULL;                \
+    board.whites |= board.pawns[0];     \
+    board.whites |= board.knights[0];   \
+    board.whites |= board.bishops[0];   \
+    board.whites |= board.rooks[0];     \
+    board.whites |= board.queens[0];    \
+    board.whites |= board.kings[0];     \
+    board.blacks = 0ULL;                \
+    board.blacks |= board.pawns[1];     \
+    board.blacks |= board.knights[1];   \
+    board.blacks |= board.bishops[1];   \
+    board.blacks |= board.rooks[1];     \
+    board.blacks |= board.queens[1];    \
+    board.blacks |= board.kings[1];     \
+    board.all = (board.whites | board.blacks)
 
 Board board_init()
 {
@@ -28,6 +44,8 @@ Board board_init()
 
     b.kings[0] |= INITIAL_WHITE_KING;
     b.kings[1] |= INITIAL_BLACK_KING;
+
+    BOARD_INIT_GROUPED_MASKS(b);
 
     b.state |= BoardState_WhiteKingSideCastleAvailable;
     b.state |= BoardState_WhiteQueenSideCastleAvailable;
@@ -80,7 +98,7 @@ Board board_from_fen(const char* fen)
         else if(is_letter(*s))
         {
             const int8_t piece = __fen_to_piece[*s - ASCII_OFFSET];
-            const int8_t side = (piece < 0 ? PIECE_BLACK : PIECE_WHITE);
+            const int8_t side = (piece < 0 ? SIDE_TO_PLAY_BLACK : SIDE_TO_PLAY_WHITE);
             const uint32_t piece_num = abs_u8(piece) - 1;
             const uint32_t b_index = (piece_num + side) * 2 - side;
 
@@ -137,6 +155,8 @@ Board board_from_fen(const char* fen)
 end:
         s++;
     }
+
+    BOARD_INIT_GROUPED_MASKS(b);
 
     return b;
 }
@@ -213,11 +233,11 @@ void board_get_white_moves(Board* board, Move* moves, size_t* moves_count)
                 MOVE_SET_FROM_SQUARE(moves[*moves_count], from_square);
                 MOVE_SET_TO_SQUARE(moves[*moves_count], to_square);
 
-                MOVE_SET_IS_CAPTURING(moves[*moves_count], move_mask & board->black_attacks);
+                MOVE_SET_IS_CAPTURING(moves[*moves_count], BIT64(to_square) & board->blacks);
 
-                *moves_count++;
+                (*moves_count)++;
 
-                UNSET_BIT(move_mask, BIT_64(to_square));
+                UNSET_BIT(move_mask, BIT64(to_square));
             }
 
             UNSET_BIT(b, BIT64(from_square));
@@ -225,26 +245,67 @@ void board_get_white_moves(Board* board, Move* moves, size_t* moves_count)
     }
 }
 
-void board_get_white_moves_in_check(Board* board, Move* moves, size_t* moves_count)
-{
-
-}
-
 void board_get_black_moves(Board* board, Move* moves, size_t* moves_count)
 {
+    *moves_count = 0;
 
+    for(uint32_t i = 0; i < 6; i++)
+    {
+        const uint32_t b_index = i * 2 + 1;
+
+        uint64_t b = ((int64_t*)board)[b_index];
+
+        const uint32_t piece = i;
+        const uint32_t side = SIDE_TO_PLAY_BLACK;
+
+        MOVE_SET_PIECE(moves[*moves_count], piece);
+
+        const uint64_t num_pieces = popcount_u64(b);
+
+        for(uint32_t j = 0; j < num_pieces; j++)
+        {
+            const uint32_t from_square = ctz_u64(b);
+
+            uint64_t move_mask = __move_gen_funcs[piece](from_square,
+                                                         side,
+                                                         board->whites,
+                                                         board->blacks);
+
+            const uint64_t num_moves = popcount_u64(move_mask);
+
+            while(move_mask)
+            {
+                const uint32_t to_square = ctz_u64(move_mask);
+
+                MOVE_SET_FROM_SQUARE(moves[*moves_count], from_square);
+                MOVE_SET_TO_SQUARE(moves[*moves_count], to_square);
+
+                MOVE_SET_IS_CAPTURING(moves[*moves_count], BIT64(to_square) & board->whites);
+
+                (*moves_count)++;
+
+                UNSET_BIT(move_mask, BIT64(to_square));
+            }
+
+            UNSET_BIT(b, BIT64(from_square));
+        }
+    }
 }
 
-void board_get_black_moves_in_check(Board* board, Move* moves, size_t* moves_count)
-{
+typedef void (*get_moves_func)(Board*, Move*, size_t*);
 
-}
+get_moves_func moves_func[2] = {
+    board_get_white_moves,
+    board_get_black_moves
+};
 
 void board_get_moves(Board* board, Move* moves, size_t* moves_count)
 {
     *moves_count = 0;
 
     const uint32_t side = BOARD_PTR_GET_SIDE_TO_PLAY(board);
+
+    moves_func[side](board, moves, moves_count);
 }
 
 uint32_t board_make_move(Board* board, const Move move)
@@ -252,29 +313,18 @@ uint32_t board_make_move(Board* board, const Move move)
     const uint32_t piece = MOVE_GET_PIECE(move);
     const uint32_t from_square = MOVE_GET_FROM_SQUARE(move);
     const uint32_t to_square = MOVE_GET_TO_SQUARE(move);
-    const uint32_t side = (uint32_t)!(board->state & BoardState_WhiteToPlay);
+    const uint32_t side = BOARD_PTR_GET_SIDE_TO_PLAY(board);
 
-    const bool has_piece = board_has_piece(board, piece, from_square, side);
-
-    if(!has_piece)
-    {
-        return BoardMoveError_PieceDoesNotExist;
-    }
-
-    const bool has_piece_target = board_has_piece(board, piece, to_square, side);
-
-    if(has_piece_target)
-    {
-        return BoardMoveError_PieceAlreadyOnThisSquare;
-    }
-
-    const uint64_t from_piece_mask = ~(1 << from_square);
-    const uint64_t to_piece_mask = 1 << to_square;
+    const uint64_t from_piece_mask = ~BIT64(from_square);
+    const uint64_t to_piece_mask = BIT64(to_square);
 
     uint64_t* board_as_ptr = (uint64_t*)board;
 
     board_as_ptr[piece * 2UL + side] &= from_piece_mask;
     board_as_ptr[piece * 2UL + side] |= to_piece_mask;
+
+    board_as_ptr[12UL + side] &= from_piece_mask;
+    board_as_ptr[12UL + side] |= to_piece_mask;
 
     const bool is_capturing = (bool)MOVE_GET_IS_CAPTURING(move);
 
@@ -285,19 +335,12 @@ uint32_t board_make_move(Board* board, const Move move)
         for(uint32_t i = 0; i < 6; i++)
         {
             board_as_ptr[i * 2UL + !side] &= ~to_piece_mask;
-
-            if(board_as_ptr[i * 2UL + !side] & to_piece_mask)
-            {
-                has_captured = true;
-                break;
-            }
         }
 
-        if(!has_captured)
-        {
-            return BoardMoveError_NoPieceToCapture;
-        }
+        board_as_ptr[12UL + !side] &= ~to_piece_mask;
     }
+
+    board->all = board->whites | board->blacks;
 
     BOARD_TOGGLE_SIDE_TO_PLAY(*board);
 
@@ -330,9 +373,9 @@ bool board_has_check_from_last_move(Board* board, Move last_move)
 
 bool board_has_check(Board* board)
 {
-    const uint32_t side = BOARD_GET_SIDE_TO_PLAY(*board);
-    const uint64_t king_mask = board->kings[!side];
-    const uint64_t attack_mask = board_get_move_mask_all_pieces(board, side);
+    const uint32_t side = BOARD_PTR_GET_SIDE_TO_PLAY(board);
+    const uint64_t king_mask = board->kings[side];
+    const uint64_t attack_mask = board_get_move_mask_all_pieces(board, !side);
 
     return king_mask & attack_mask;
 }
@@ -437,83 +480,22 @@ uint64_t board_perft_recurse(Board* board, uint32_t depth, uint32_t max_depth)
 {
     if(depth == max_depth)
     {
-        return 0;
+        return 1;
     }
 
     uint64_t total_moves = 0;
 
-    const uint32_t side = !(board->state & BoardState_WhiteToPlay);
+    uint64_t moves_count = 0;
+    Move moves[BOARD_MAX_MOVES];
 
-    const uint64_t white_pieces = board->pawns[0] |
-                                  board->knights[0] |
-                                  board->bishops[0] |
-                                  board->rooks[0] |
-                                  board->queens[0] |
-                                  board->kings[0];
+    board_get_moves(board, moves, &moves_count);
 
-    const uint64_t black_pieces = board->pawns[1] |
-                                  board->knights[1] |
-                                  board->bishops[1] |
-                                  board->rooks[1] |
-                                  board->queens[1] |
-                                  board->kings[1];
-
-    const uint64_t pieces[2] = {
-        white_pieces,
-        black_pieces,
-    };
-
-    const uint64_t inv_pieces[2] = {
-        ~white_pieces,
-        ~black_pieces,
-    };
-
-    const uint64_t all_pieces = white_pieces | black_pieces;
-    const uint64_t inv_all_pieces = inv_pieces[0] | inv_pieces[1];
-
-    for(uint32_t i = 0; i < 6; i++)
+    for(size_t i = 0; i < moves_count; i++)
     {
-        const uint32_t b_index = i * 2 + side;
+        Board other_board = *board;
+        board_make_move(&other_board, moves[i]);
 
-        uint64_t b = ((int64_t*)board)[b_index];
-
-        const uint32_t piece = (uint32_t)i;
-
-        Move m;
-
-        MOVE_SET_PIECE(m, piece);
-
-        const uint64_t num_pieces = popcount_u64(b);
-
-        for(uint32_t k = 0; k < num_pieces; k++)
-        {
-            const uint32_t from_square = ctz_u64(b);
-            uint64_t move_mask = __move_gen_funcs[piece](from_square,
-                                                         side,
-                                                         white_pieces,
-                                                         black_pieces);
-
-            const uint64_t num_moves = popcount_u64(move_mask);
-
-            MOVE_SET_FROM_SQUARE(m, from_square);
-
-            for(uint32_t l = 0; l < num_moves; l++)
-            {
-                const uint32_t to_square = ctz_u64(move_mask);
-                MOVE_SET_TO_SQUARE(m, to_square);
-
-                total_moves++;
-
-                Board new_board = *board;
-                board_make_move_unsafe(&new_board, m);
-
-                total_moves += board_perft_recurse(&new_board, depth + 1, max_depth);
-
-                UNSET_BIT(move_mask, BIT64(to_square));
-            }
-
-            UNSET_BIT(b, BIT64(from_square));
-        }
+        total_moves += board_perft_recurse(&other_board, depth + 1, max_depth);
     }
 
     return total_moves;

@@ -48,7 +48,7 @@ void pawns_moves(Board* b)
     pawns = board_get_pawns(b, SIDE_TO_PLAY_BLACK);
 
     const uint64_t pawns_moves_black[6] = {
-        8ULL,
+        0ULL,
         0ULL,
         65536ULL,
         131072ULL,
@@ -85,7 +85,7 @@ void knights_moves(Board* b)
 
     uint64_t knights = board_get_knights(b, SIDE_TO_PLAY_WHITE);
 
-    const uint64_t knights_moves_white[0] = {};
+    const uint64_t* knights_moves_white = NULL;
 
     uint64_t i = 0;
 
@@ -294,7 +294,7 @@ void queens_moves(Board* b)
 
     queens = board_get_queens(b, SIDE_TO_PLAY_BLACK);
 
-    const uint64_t queens_moves_black[0] = {};
+    const uint64_t* queens_moves_black = NULL;
 
     i = 0;
 

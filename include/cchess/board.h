@@ -5,7 +5,8 @@
 
 #include "cchess/cchess.h"
 #include "cchess/move.h"
-#include "cchess/bit_utils.h"
+
+#include "libromano/bit.h"
 
 typedef enum 
 {
@@ -46,9 +47,6 @@ typedef struct Board
     uint64_t whites;
     uint64_t blacks;
 
-    uint64_t white_attacks;
-    uint64_t black_attacks;
-
     uint64_t all;
 
     uint32_t state;
@@ -59,14 +57,14 @@ typedef struct Board
 
 #define BOARD_MAX_MOVES 256
 
-#define BOARD_GET_SIDE_TO_PLAY(board) ((board).state & BoardState_WhiteToPlay)
+#define BOARD_GET_SIDE_TO_PLAY(board) (!((board).state & BoardState_WhiteToPlay))
 #define BOARD_TOGGLE_SIDE_TO_PLAY(board) ((board).state ^= BoardState_WhiteToPlay)
 #define BOARD_SET_CHECK(board) ((board).state &= BoardState_HasCheck)
 #define BOARD_SET_MATE(board) ((board).state &= BoardState_HasMate)
 #define BOARD_HAS_CHECK(board) ((board).state & BoardState_HasCheck)
 #define BOARD_HAS_MATE(board) ((board).state & BoardState_HasMate)
 
-#define BOARD_PTR_GET_SIDE_TO_PLAY(board) (board->state & BoardState_WhiteToPlay)
+#define BOARD_PTR_GET_SIDE_TO_PLAY(board) (!(board->state & BoardState_WhiteToPlay))
 #define BOARD_PTR_TOGGLE_SIDE_TO_PLAY(board) (board->state ^= BoardState_WhiteToPlay)
 #define BOARD_PTR_SET_CHECK(board) (board->state &= BoardState_HasCheck)
 #define BOARD_PTR_SET_MATE(board) (board->state &= BoardState_HasMate)
@@ -178,16 +176,6 @@ CCHESS_FORCE_INLINE uint64_t board_get_white(Board* board)
 CCHESS_FORCE_INLINE uint64_t board_get_black(Board* board)
 {
     return board->blacks;
-}
-
-CCHESS_FORCE_INLINE uint64_t board_get_white_attacks(Board* board)
-{
-    return board->white_attacks;
-}
-
-CCHESS_FORCE_INLINE uint64_t board_get_black_attacks(Board* board)
-{
-    return board->black_attacks;
 }
 
 CCHESS_FORCE_INLINE uint64_t board_get_all(Board* board)

@@ -26,27 +26,19 @@ int main(int argc, char** argv)
     board_debug_move_masks(&b);
 #endif /* DEBUG_MOVE_MASKS */
 
-    SCOPED_PROFILE_START_MICROSECONDS(legal_moves);
-
-    Move m;
-    BoardMoveIterator move_it = board_move_iterator_init();
-
-    uint32_t plies = 1;
-
-    uint64_t num_moves = 0;
-
-    while(board_legal_moves_iterator(&b, &m, &move_it))
-    {
-        num_moves++;
-    };
-
-    SCOPED_PROFILE_END_MICROSECONDS(legal_moves);
-
-    printf("Num moves found for %u plies: %llu\n", plies, num_moves);
-
     logger_log(LogLevel_Info, "Starting perft test");
 
-    for(uint32_t i = 1; i < 5; i++)
+    const uint64_t perft_result[7] = {
+        20ULL,
+        400ULL,
+        8902ULL,
+        197281ULL,
+        4865609ULL,
+        119060324ULL,
+        3195901860ULL,
+    };
+
+    for(uint32_t i = 1; i < 6; i++)
     {
         logger_log(LogLevel_Info, "Perft %u: %llu", i, board_perft(&b, i));
     }

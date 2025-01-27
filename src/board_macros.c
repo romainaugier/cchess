@@ -1,5 +1,4 @@
 #include "cchess/board_macros.h"
-#include "cchess/bit_utils.h"
 
 #include <stdio.h>
 #include <string.h>

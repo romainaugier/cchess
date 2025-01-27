@@ -5,6 +5,8 @@
 
 #include "cchess/cchess.h"
 
+#include "libromano/bit.h"
+
 CCHESS_API const char* __piece_as_string(const uint32_t piece);
 
 #define PIECE_AS_STRING(p) (__piece_as_string(p))
