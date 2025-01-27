@@ -8,6 +8,12 @@
 
 #define DEBUG_MOVE_MASKS 1
 
+#if CCHESS_DEBUG
+#define PERFT 6
+#else
+#define PERFT 7
+#endif /* CCHESS_DEBUG */
+
 #include <stdio.h>
 
 int main(int argc, char** argv)
@@ -38,7 +44,7 @@ int main(int argc, char** argv)
         3195901860ULL,
     };
 
-    for(uint32_t i = 1; i < 6; i++)
+    for(uint32_t i = 1; i < PERFT; i++)
     {
         logger_log(LogLevel_Info, "Perft %u: %llu", i, board_perft(&b, i));
     }
